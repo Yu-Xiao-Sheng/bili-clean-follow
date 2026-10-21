@@ -1,0 +1,17 @@
+# Node
+node_modules/
+dist/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+.DS_Store
+
+# Secrets (never commit tokens)
+.env
+credentials.json
+bili_cookies.json
