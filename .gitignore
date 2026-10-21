@@ -8,6 +8,16 @@ __pycache__/
 *.pyc
 .venv/
 
+# Python build & test artifacts (keep out of the repo)
+build/
+*.egg-info/
+*.egg
+*.whl
+.pytest_cache/
+
+# User-local report output (never committed)
+tmp/
+
 # OS
 .DS_Store
 

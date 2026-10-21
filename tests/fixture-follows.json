@@ -1,0 +1,37 @@
+[
+  {
+    "follower_id": "U100001",
+    "mid": "mid100001",
+    "nickname": "阿花01",
+    "bio": "官方认证工作室",
+    "last_seen_days": 2.0,
+    "last_video_days": 3.0,
+    "follower_count": 200000,
+    "following_count": 100
+  },
+  {
+    "follower_id": "U100002",
+    "mid": "mid100002",
+    "nickname": "小鹿02",
+    "bio": "分享风景与生活",
+    "last_seen_days": 45.0,
+    "last_video_days": 60.0,
+    "follower_count": 8000,
+    "following_count": 300
+  },
+  {
+    "follower_id": "U100003",
+    "mid": "mid100003",
+    "nickname": "阿远03",
+    "bio": "",
+    "last_seen_days": 600.0,
+    "last_video_days": 700.0,
+    "follower_count": 50,
+    "following_count": 20000
+  },
+  {
+    "follower_id": "U100004",
+    "mid": "mid100004",
+    "nickname": "青禾04"
+  }
+]
