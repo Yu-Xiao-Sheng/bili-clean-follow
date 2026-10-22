@@ -1,0 +1,27 @@
+[
+  {
+    "name": "bug",
+    "color": "d73a49",
+    "description": "Reported defects or unexpected behavior"
+  },
+  {
+    "name": "enhancement",
+    "color": "0066cc",
+    "description": "New features or enhancements"
+  },
+  {
+    "name": "good first issue",
+    "color": "e6a817",
+    "description": "Beginner-friendly, suitable for first-time contributors"
+  },
+  {
+    "name": "documentation",
+    "color": "008577",
+    "description": "Documentation-related issues and suggestions"
+  },
+  {
+    "name": "question",
+    "color": "91883b",
+    "description": "Usage questions or discussions"
+  }
+]
