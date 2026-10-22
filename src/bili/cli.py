@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Report-only mode (default). Never touches your account.")
     p.add_argument("--unfollow-list", metavar="PATH",
         help="After review, write the REMOVE list to this file for manual action.")
-    p.add_argument("--version", action="version", version=f"%%(prog)s {__version__}")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return p
 
 

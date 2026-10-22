@@ -46,14 +46,29 @@ def test_cli_summary_in_stderr():
     out = run_cli(str(FIXTURE))
     assert "Summary:" in out.stderr
     assert "keep=" in out.stderr
+    assert "remove=" in out.stderr
 
 
 def test_cli_unfollow_list_only_remove():
-    import csv, io
     tmp = REPO_ROOT / "tmp"
     tmp.mkdir(exist_ok=True)
     out = run_cli(str(FIXTURE), "--unfollow-list", str(tmp / "unfollow.txt"))
     assert out.returncode == 0
     ids = [l.strip() for l in (tmp / "unfollow.txt").read_text().splitlines() if l.strip()]
+    # only REMOVE-class ids are written: U100003 and U100004 (no signals)
+    assert ids == ["U100003", "U100004"]
     assert all(i.startswith("U") for i in ids)
-    assert "U100003" in ids
+
+
+def test_cli_version():
+    out = run_cli("--version")
+    assert out.returncode == 0
+    assert out.stdout.strip() == "bili-clean 0.1.0"
+    assert "%(prog)s" not in out.stdout  # regression: f-string bug (literal %%(prog)s)
+
+
+def test_cli_missing_file_exit_code_2():
+    out = run_cli("does-not-exist.json")
+    assert out.returncode == 2
+    assert "error:" in out.stderr
+    assert "could not load follows" in out.stderr
