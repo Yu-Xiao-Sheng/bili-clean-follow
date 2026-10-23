@@ -9,6 +9,7 @@ import random
 from datetime import datetime, timedelta
 
 from .model import FollowRecord
+from .streams import harden_stdio
 
 
 def _base_name(i):
@@ -67,5 +68,6 @@ def save(path: str, count: int = 24, seed: int = 7) -> str:
 
 
 if __name__ == "__main__":
+    harden_stdio()  # FOR-38: 中文控制台打印昵称不崩
     path = os.path.join(os.getcwd(), "sample-follows.json")
     print("Sample follows written to %s" % save(path))

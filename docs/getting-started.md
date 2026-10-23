@@ -51,8 +51,10 @@ privacy-safe way to get one:
      lookups you export by hand or with a companion script.
 
 > Privacy note: the input file is yours. This tool never uploads or shares it.
-> Never commit it to this repository - the CLI refuses file names that look like
-> cookie/credential exports.
+> Never commit it to this repository. The CLI judges the file **content**: it refuses
+> anything that really carries cookie/credential keys (SESSDATA, bili_jct, ...). If
+> only the file *name* looks like a cookie export you get a warning plus a rename hint
+> (save it as bili-follows.json), not a hard refusal.
 
 ## 4. Run the cleaner
 
@@ -61,7 +63,9 @@ bili-clean follows.json --md report.md --csv report.csv --unfollow-list to-unfol
 ```
 
 Then open report.md and act on to-unfollow.txt manually in your Bilibili account.
-This tool does not touch your account.
+This tool does not touch your account. Each to-unfollow.txt row is `mid <TAB> nickname`
+(search the nickname on your follows page), and report.csv is utf-8-sig so Excel /
+WPS on Windows opens it without mojibake.
 
 ## 5. How scoring works
 

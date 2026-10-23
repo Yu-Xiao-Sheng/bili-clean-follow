@@ -4,7 +4,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bili.export import run, to_markdown, to_csv, _clean_pipe
+from bili.export import (CSV_ENCODING, TEXT_ENCODING, run,
+                     to_markdown, to_csv, to_unfollow_list,
+                     unfollow_rows, _clean_pipe)
 from bili.model import FollowRecord
 
 
@@ -131,3 +133,48 @@ class TestToCsv:
     def test_clean_pipe(self):
         assert _clean_pipe("a|b") == "a\\|b"
         assert _clean_pipe("no pipes") == "no pipes"
+
+
+class TestUnfollowList:
+    """FOR-38：取关清单必须能人工对上号（mid + Tab + 昵称），且只是核对清单。"""
+
+    @staticmethod
+    def _rows(text):
+        return [l for l in text.splitlines() if l and not l.startswith("#")]
+
+    def test_rows_carry_mid_and_nickname(self):
+        results = [
+            {"follower_id": "U1", "mid": "111", "nickname": "留着的人", "class": "keep"},
+            {"follower_id": "U2", "mid": "22965610", "nickname": "头条小哥🔥", "class": "remove"},
+        ]
+        text = to_unfollow_list(results)
+        assert self._rows(text) == ["22965610\t头条小哥🔥"]
+        comments = [l for l in text.splitlines() if l.startswith("#")]
+        assert any("不会自动取关" in l for l in comments)
+        assert any("report-only" in l.lower() for l in comments)
+        assert "nickname" in comments[-1].lower()
+
+    def test_falls_back_to_follower_id_when_mid_missing(self):
+        text = to_unfollow_list([{"follower_id": "U100", "nickname": "没有 mid",
+                                  "class": "remove"}])
+        assert self._rows(text) == ["U100\t没有 mid"]
+
+    def test_tabs_and_newlines_in_nickname_are_flattened(self):
+        text = to_unfollow_list([{"follower_id": "1", "nickname": "有\t制表\n换行",
+                                  "class": "remove"}])
+        assert self._rows(text) == ["1\t有 制表 换行"]
+
+    def test_no_rows_when_nothing_is_remove(self):
+        text = to_unfollow_list([{"follower_id": "1", "mid": "1",
+                                  "nickname": "留着", "class": "keep"}])
+        assert self._rows(text) == []
+
+    def test_unfollow_rows_for_ui_mirrors_the_text(self):
+        results = [{"follower_id": "U2", "mid": "22965610",
+                    "nickname": "头条小哥🔥", "class": "remove"}]
+        assert unfollow_rows(results) == [{"mid": "22965610",
+                                           "nickname": "头条小哥🔥"}]
+
+    def test_encodings_are_the_excel_friendly_ones(self):
+        assert CSV_ENCODING == "utf-8-sig"
+        assert TEXT_ENCODING == "utf-8"

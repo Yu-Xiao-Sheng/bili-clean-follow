@@ -58,6 +58,9 @@ def test_index_html_serves_report(sample_server):
     status, headers, body = _get(base, "/")
     assert status == 200
     text = body.decode("utf-8")
+    # FOR-38: 导出说明要在页面上写清楚（BOM / mid + 昵称），用户才不会再踩坑。
+    assert "mid + Tab + 昵称" in text
+    assert "UTF-8 BOM" in text
     assert "B站关注分类报告" in text
     assert "导出 Markdown" in text
     assert "导出 CSV" in text
@@ -105,7 +108,9 @@ def test_export_md_and_csv(sample_server):
 
     status, headers, body = _get(base, "/export?fmt=csv")
     assert status == 200
-    text = body.decode("utf-8")
+    # FOR-38: CSV 必须带 UTF-8 BOM，否则 Windows Excel/WPS 双击打开中文乱码。
+    assert body.startswith(b"\xef\xbb\xbf"), "web CSV must be utf-8-sig"
+    text = body.decode("utf-8-sig")
     assert text.startswith("follower_id,nickname")
 
 
@@ -116,11 +121,20 @@ def test_unfollow_requires_confirmation(sample_server):
     _expect_error(base, "/unfollow", 400)
     status, headers, body = _get(base, "/unfollow?confirm=1")
     assert status == 200
-    expected_ids = "\n".join(
-        r["follower_id"] for r in export_run(demo.generate(SAMPLE_COUNT, SAMPLE_SEED))
-        if r["class"] == "remove"
-    )
-    assert body.decode("utf-8") == expected_ids + "\n"
+    results = export_run(demo.generate(SAMPLE_COUNT, SAMPLE_SEED))
+    expected = [r for r in results if r["class"] == "remove"]
+    assert expected
+    assert body.startswith(b"\xef\xbb\xbf"), "unfollow list must be utf-8-sig"
+    text = body.decode("utf-8-sig")
+    rows = [l for l in text.splitlines() if l and not l.startswith("#")]
+    # FOR-38: 只有 mid 的清单没用，每行必须带上昵称才能人工对上号。
+    # 清单第一列是 B站 UID（mid），没有 mid 时才退回 follower_id。
+    assert [l.split("\t")[0] for l in rows] == \
+        [(r["mid"] or r["follower_id"]) for r in expected]
+    assert [l.split("\t")[1] for l in rows] == [r["nickname"] for r in expected]
+    comments = [l for l in text.splitlines() if l.startswith("#")]
+    assert any("不会自动取关" in l for l in comments)
+    assert any("nickname" in l.lower() for l in comments)
     assert "attachment" in headers.get("Content-Disposition", "")
 
 
@@ -145,7 +159,10 @@ def test_all_keep_has_empty_unfollow_list(tmp_path):
         base = _base(srv)
         status, headers, body = _get(base, "/unfollow?confirm=1")
         assert status == 200
-        assert body == b""
+        # 没有删除候选时只剩说明行，没有任何可执行条目。
+        text = body.decode("utf-8-sig")
+        assert [l for l in text.splitlines() if l and not l.startswith("#")] == []
+        assert any("不会自动取关" in l for l in text.splitlines())
         status, headers, body = _get(base, "/api/results?cls=remove")
         assert json.loads(body.decode("utf-8"))["count"] == 0
     finally:

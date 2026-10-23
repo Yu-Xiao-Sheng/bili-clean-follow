@@ -25,7 +25,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
-from .export import run, to_csv, to_markdown
+from .export import (CSV_ENCODING, run, to_csv, to_markdown,
+                     to_unfollow_list)
+from .streams import harden_stdio
 from .loaders import SENSITIVE_NAME_RE, load_from_file, refuse_sensitive_path  # noqa: F401
 
 DEFAULT_PORT = 8787
@@ -141,7 +143,7 @@ td{vertical-align:top}
   <h1>B站关注分类报告</h1>
   <p class="sub">bili-clean-follow v__VER__ · 本地只读 · 数据不出本机</p>
   <a class="btn" href="/export?fmt=md" download="bili-clean-report.md">导出 Markdown</a>
-  <a class="btn" href="/export?fmt=csv" download="bili-clean-report.csv">导出 CSV</a>
+  <a class="btn" href="/export?fmt=csv" download="bili-clean-report.csv">导出 CSV（Excel 可直接打开）</a>
 </header>
 <section class="cards">
   <div class="card total">
@@ -184,9 +186,11 @@ PAGE_TAIL = """<section class="remove-panel">
     <span>我已逐一审核以上待删除项，确认无误</span>
   </label>
   <a class="btn" id="export-unfollow" href="/unfollow?confirm=1"
-     download="unfollow-list.txt" disabled>导出取关清单 (.txt)</a>
+     download="unfollow-list.txt" disabled>导出取关清单 (.txt · mid + 昵称)</a>
   <p class="hint">导出后仍需你在 B站 手动取关；本工具从不调用 unfollow API，
      也不会将你的 cookie / 密钥上传到任何服务。</p>
+  <p class="hint">取关清单每行是 mid + Tab + 昵称，可先在 B站 关注页按昵称搜索核对；
+     CSV 带 UTF-8 BOM，Excel / WPS 双击打开不会乱码。</p>
 </section>
 </div>
 <script type="application/json" id="bili-summary">__SUMMARY_JSON__</script>
@@ -384,7 +388,7 @@ class WebHandler(BaseHTTPRequestHandler):
                     "bili-clean-report.md", "text/markdown; charset=utf-8")
             elif fmt == "csv":
                 self._send_attachment(
-                    200, to_csv(self.results).encode("utf-8"),
+                    200, to_csv(self.results).encode(CSV_ENCODING),
                     "bili-clean-report.csv", "text/csv; charset=utf-8")
             else:
                 self._send_json(400, {"error": "fmt must be md or csv"})
@@ -394,9 +398,9 @@ class WebHandler(BaseHTTPRequestHandler):
                     "error": "confirmation required: tick the confirmation "
                     "checkbox and request this page again"})
                 return
-            rows = [r for r in self.results if r.get("class") == "remove"]
-            body = ("\n".join(str(r.get("follower_id", "")) for r in rows)
-                    + ("\n" if rows else "")).encode("utf-8")
+            # FOR-38: 与 CLI 共用同一份清单（mid + Tab + 昵称 + 人工核对抬头），
+            # 并用 utf-8-sig，记事本/Excel 打开不乱码。
+            body = to_unfollow_list(self.results).encode(CSV_ENCODING)
             self._send_attachment(
                 200, body, "unfollow-list.txt", "text/plain; charset=utf-8")
         else:
@@ -412,6 +416,8 @@ def build_server(results: list, host: str = "127.0.0.1", port: int = 0):
     srv = ThreadingHTTPServer((host, port), WebHandler)
     return srv
 def main(argv: list = None) -> int:
+    # FOR-38: Windows 中文控制台默认 GBK，中文 / emoji 日志不能炸栈。
+    harden_stdio()
     parser = argparse.ArgumentParser(
         prog="bili.web",
         description="Serve a local read-only web report of the follow cleanup.")

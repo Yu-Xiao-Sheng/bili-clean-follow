@@ -17,7 +17,9 @@ to unfollow.
   touches your account.
 - **Explainable**: every decision carries a numeric score and a reason string.
 - **Exports** **Markdown** (for humans) and **CSV** (for spreadsheets), plus an
-  optional "unfollow list" of candidate ids.
+  optional "unfollow list": one row per candidate, `mid <TAB> nickname`.
+- **Safe on Chinese Windows**: emoji nicknames no longer crash a GBK console,
+  and CSV / unfollow-list files are utf-8-sig so Excel shows Chinese correctly.
 - **Neutral on missing data** — a follow with no signals is never auto-kept.
 - **No committed credentials**; works from a user-provided JSON export.
 

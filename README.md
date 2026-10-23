@@ -21,7 +21,8 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 
 - **默认只出报告，安全**：它从不调用 unfollow API，不触碰你的账号。
 - **可解释**：每个决策都附带一个数值分数和一个原因字符串。
-- **导出** Markdown（给人看）和 CSV（给表格），以及可选的"取关候选清单"（候选 id）。
+- **导出** Markdown（给人看）和 CSV（带 UTF-8 BOM，Excel / WPS 双击打开不乱码），以及可选的"取关候选清单"（每行 mid + Tab + 昵称，能直接在 B站 关注页核对）。
+- **中文控制台安全**：Windows 中文环境（GBK）下昵称含 emoji 也不会崩，报告照常产出。
 - **数据缺失时中立**——没有信号的账号永远不会被自动保留。
 - **不提交凭据**；基于用户提供的 JSON 导出工作。
 
@@ -59,6 +60,7 @@ bili-clean sample-follows.json --md report.md --csv report.csv --unfollow-list t
 
 示例数据固定，预期输出：`Summary: keep=13 review=2 remove=9`（24 个关注，9 个进入取关候选）。
 打开 report.md 看逐条理由，再自己决定怎么处理 to-unfollow.txt。
+to-unfollow.txt 每行是 `mid <TAB> 昵称`，抬头写明这是人工核对清单——工具不会自动取关。
 
 **第 3 步 · 换成你自己的导出**
 
