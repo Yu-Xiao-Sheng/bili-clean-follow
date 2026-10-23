@@ -347,7 +347,7 @@ class WebHandler(BaseHTTPRequestHandler):
     results = []
     summary = {"total": 0, "counts": {}, "pct": {}}
     page_html = ""
-    version = "0.1.0"
+    version = __version__
 
     def log_message(self, fmt, *args):
         # Never log record content; the request path never carries user data.

@@ -63,7 +63,7 @@ def test_cli_unfollow_list_only_remove():
 def test_cli_version():
     out = run_cli("--version")
     assert out.returncode == 0
-    assert out.stdout.strip() == "bili-clean 0.1.0"
+    assert out.stdout.strip() == "bili-clean 0.1.1"
     assert "%(prog)s" not in out.stdout  # regression: f-string bug (literal %%(prog)s)
 
 

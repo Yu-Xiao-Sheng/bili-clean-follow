@@ -78,7 +78,7 @@ def test_summary_api(sample_server):
 def test_health(sample_server):
     status, headers, body = _get(_base(sample_server), "/api/health")
     assert status == 200
-    assert json.loads(body.decode("utf-8")) == {"ok": True, "version": "0.1.0"}
+    assert json.loads(body.decode("utf-8")) == {"ok": True, "version": "0.1.1"}
 
 
 def test_results_filter(sample_server):
