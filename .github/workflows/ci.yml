@@ -15,6 +15,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Credential leak scan (cookie/key hardening, FOR-27)
+        run: |
+          if grep -RniE "SESS_[0-9A-Za-z_-]{8,}|eyJ[A-Za-z0-9_-]{40,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{20,}" --exclude-dir=.git . ; then
+            echo "Possible credentials detected in the repo; fix before merging."
+            exit 1
+          fi
+          echo "Credential leak scan: OK"
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:

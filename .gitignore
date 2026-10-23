@@ -25,3 +25,17 @@ tmp/
 .env
 credentials.json
 bili_cookies.json
+
+# Secrets & credentials (FOR-27 hardening: never commit cookies/keys)
+*.cookie
+*.cookies
+cookie*.json
+credentials*.json
+auth*.json
+*.token
+*.key
+*.pem
+*.p12
+*.pfx
+.env.*
+secrets/
