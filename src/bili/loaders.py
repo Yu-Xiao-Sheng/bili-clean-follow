@@ -1,7 +1,28 @@
 import json
+import os
+import re
 from typing import Any
 
 from .model import FollowRecord
+
+# A "sensitive" input path is a raw cookie / credential file (SESS_bili,
+# bili_cookies.json, auth.json, .env, ...). bili-clean only ever reads the
+# cleaned JSON export the user produced, never raw credentials, so this guard
+# is shared by the CLI and the web report (FOR-27 cookie/key hardening).
+SENSITIVE_NAME_RE = re.compile(
+    r"(?i)(sess|cookie|credent|secret|auth|api[_-]?key|token|passwd|password|\.env|session)"
+)
+
+
+def refuse_sensitive_path(path: str) -> None:
+    """Reject credential-shaped input paths before anything is opened."""
+    name = os.path.basename(str(path))
+    if SENSITIVE_NAME_RE.search(name):
+        raise ValueError(
+            "refusing to load %r: bili-clean only accepts a cleaned JSON "
+            "export. Never point it at cookies, keys or credential files."
+            % name
+        )
 
 
 def load_from_text(text: str) -> list:
@@ -10,6 +31,7 @@ def load_from_text(text: str) -> list:
 
 
 def load_from_file(path: str) -> list:
+    refuse_sensitive_path(path)
     with open(path, "r", encoding="utf-8") as fh:
         return load_from_text(fh.read())
 

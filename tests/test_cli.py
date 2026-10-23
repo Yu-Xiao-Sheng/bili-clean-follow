@@ -72,3 +72,13 @@ def test_cli_missing_file_exit_code_2():
     assert out.returncode == 2
     assert "error:" in out.stderr
     assert "could not load follows" in out.stderr
+
+
+def test_cli_refuses_credential_input():
+    # v0.1.1 shipped the guard on the web path only; the CLI shares it now.
+    for bad in ("SESS_bili.json", "bili_cookies.json", "my_api_key.json",
+                "user.env", "auth.json", "session.json"):
+        out = run_cli(bad)
+        assert out.returncode == 2, bad
+        assert "refusing to load" in out.stderr, bad
+        assert "Traceback" not in out.stderr, bad

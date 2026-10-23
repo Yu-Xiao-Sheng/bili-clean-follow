@@ -20,34 +20,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
 from .export import run, to_csv, to_markdown
-from .loaders import load_from_file
+from .loaders import SENSITIVE_NAME_RE, load_from_file, refuse_sensitive_path  # noqa: F401
 
 DEFAULT_PORT = 8787
-
-# A "sensitive" input path is a raw cookie / credential file (e.g.
-# SESS_bili, bili_cookies.json, auth.json, .env). The web report only
-# accepts the cleaned JSON export produced by the CLI.
-SENSITIVE_NAME_RE = re.compile(
-    r"(?i)(sess|cookie|credent|secret|auth|api[_-]?key|token|passwd|password|\.env|session)"
-)
-
-
-def refuse_sensitive_path(path: str) -> None:
-    name = os.path.basename(path)
-    if SENSITIVE_NAME_RE.search(name):
-        raise ValueError(
-            "refusing to load %r: the web report only accepts a cleaned "
-            "JSON export. Never point it at cookies, keys or credential files."
-            % name
-        )
 
 
 def load_report(input_path: str) -> list:
