@@ -27,18 +27,54 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 
 ## 快速开始
 
-```python
-python -m bili.demo          # 生成 sample-follows.json
-bili-clean sample-follows.json --md report.md
+前置：Python 3.9+（CI 覆盖 3.9–3.13；本轮实测 Python 3.13.15，63 项 pytest 全绿）。
+以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
+
+**第 1 步 · 先安装（必须，二选一）**
+
+本包是 src/ 布局，未安装直接跑会报 ModuleNotFoundError: No module named 'bili'。
+
+方式 A · 直接装 Release 包（不用克隆）：
+
+```
+pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.1/bili-clean-follow-0.1.1.zip
 ```
 
-或带你自己的导出：
+方式 B · 克隆后本地安装：
+
+```
+git clone https://github.com/Yu-Xiao-Sheng/bili-clean-follow.git
+cd bili-clean-follow
+pip install -e .
+```
+
+装好后可以确认一下：`bili-clean --version` 输出 `bili-clean 0.1.1`。
+
+**第 2 步 · 跑内置示例**
+
+```
+python -m bili.demo
+bili-clean sample-follows.json --md report.md --csv report.csv --unfollow-list to-unfollow.txt
+```
+
+示例数据固定，预期输出：`Summary: keep=13 review=2 remove=9`（24 个关注，9 个进入取关候选）。
+打开 report.md 看逐条理由，再自己决定怎么处理 to-unfollow.txt。
+
+**第 3 步 · 换成你自己的导出**
 
 ```
 bili-clean follows.json --md report.md --csv report.csv --unfollow-list to-unfollow.txt
 ```
 
-然后打开 report.md，手动处理 to-unfollow.txt。
+怎么拿到 follows.json 见 [docs/getting-started.md](docs/getting-started.md)。
+
+**第 4 步 · 本地 Web 报告（可选）**
+
+```
+python -m bili.web --input sample-follows.json
+```
+
+打开 http://127.0.0.1:8787 （只监听 127.0.0.1，只读；页面顶部显示 `bili-clean-follow v0.1.1 · 本地只读 · 数据不出本机`）。
 
 ## 如何得分
 
@@ -60,21 +96,14 @@ docs/            # spec.md, getting-started.md, scoring-model.md
 pyproject.toml
 ```
 
-## 安全说明
-
-这个工具只报告。它**不会** unfollow，**不会**上传你的数据，也**不会**保存任何东西。对任何关注采取行动之前，先审阅报告。
-
-## 许可证
-
-MIT。
 ## 本地 Web 报告（可选）
 
 不想只读终端/文件输出，可以起一个本地报表界面（默认仅监听 127.0.0.1，只读）：
 
-`
+```
 python -m bili.demo                            # 生成示例 sample-follows.json
 python -m bili.web --input sample-follows.json
-`
+```
 
 打开 http://127.0.0.1:8787 即可看到：
 - 摘要卡：总关注数与 keep / review / remove 三类各自的数量与占比；
@@ -83,3 +112,11 @@ python -m bili.web --input sample-follows.json
 - 一键导出 Markdown / CSV 报告。
 
 数据全程留在本机：本工具不连接任何外部服务，从不调用 unfollow API。
+
+## 安全说明
+
+这个工具只报告。它**不会** unfollow，**不会**上传你的数据，也**不会**保存任何东西。对任何关注采取行动之前，先审阅报告。
+
+## 许可证
+
+MIT。
