@@ -110,6 +110,23 @@ def load_from_file(path: str) -> list:
         return load_from_text(fh.read())
 
 
+def load_raw_from_text(text: str) -> List[dict]:
+    """Same unwrapping rules as load_from_text, but keeps the original dicts.
+
+    bili-merge (FOR-40) has to write the user's export back out, so it needs the
+    untouched rows - avatar / uname / rank and any other field must survive.
+    """
+    data = json.loads(text)
+    return [d for d in _to_list(data) if isinstance(d, dict)]
+
+
+def load_raw_from_file(path: str) -> List[dict]:
+    """Raw-item twin of load_from_file (same cookie guard, same utf-8-sig read)."""
+    refuse_sensitive_path(path)
+    with open(path, "r", encoding="utf-8-sig") as fh:
+        return load_raw_from_text(fh.read())
+
+
 def _to_list(data: Any) -> list:
     if isinstance(data, list):
         return data

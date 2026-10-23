@@ -23,6 +23,7 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 - **可解释**：每个决策都附带一个数值分数和一个原因字符串。
 - **导出** Markdown（给人看）和 CSV（带 UTF-8 BOM，Excel / WPS 双击打开不乱码），以及可选的"取关候选清单"（每行 mid + Tab + 昵称，能直接在 B站 关注页核对）。
 - **中文控制台安全**：Windows 中文环境（GBK）下昵称含 emoji 也不会崩，报告照常产出。
+- **补信号伴生工具 `bili-merge`**：生成已预填 mid + 昵称的 signals.csv 模板，你只填 4 个数字，合并后重跑；纯本地，不联网、不调 B站 API。
 - **数据缺失时中立**——没有信号的账号永远不会被自动保留。
 - **不提交凭据**；基于用户提供的 JSON 导出工作。
 
@@ -70,7 +71,20 @@ bili-clean follows.json --md report.md --csv report.csv --unfollow-list to-unfol
 
 怎么拿到 follows.json 见 [docs/getting-started.md](docs/getting-started.md)。
 
-**第 4 步 · 本地 Web 报告（可选）**
+**第 4 步 · 补信号（可选，但决定 remove 是否可信）**
+
+真实导出只有昵称与简介，缺「最近活跃」和「粉丝 / 关注数」这两类信号，这时报告只能排序。用随包附带的 bili-merge 补：
+
+```
+bili-merge follows.json --template signals.csv     # 生成模板：mid + 昵称已预填
+# 在 Excel / WPS 里填 4 个数字列（last_seen_days / last_video_days / follower_count / following_count，拿不到的留空）
+bili-merge follows.json --signals signals.csv      # 合并出 follows.merged.json
+bili-clean follows.merged.json --md report.md --csv report.csv --unfollow-list to-unfollow.txt
+```
+
+留空 = 未知：未知不会被当成取关理由，这类记录只会进 review 用于排序。没装包直接跑源码时用 `PYTHONPATH=src python -m bili.merge_cli`。
+
+**第 5 步 · 本地 Web 报告（可选）**
 
 ```
 python -m bili.web --input sample-follows.json

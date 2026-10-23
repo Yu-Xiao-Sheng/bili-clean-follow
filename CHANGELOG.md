@@ -17,6 +17,7 @@ Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 - docs/getting-started.md 修复被转义吃掉的命令与文件名（report.md、to-unfollow.txt 等），并去掉「不用安装直接跑源码」的错误指引
 
 ### Added
+- `bili-merge` 补信号伴生工具（FOR-40）：`--template` 生成已预填 mid + 昵称的 signals.csv（utf-8-sig，Excel/WPS 直接编辑），`--signals` 把手工抄的 last_seen_days / last_video_days / follower_count / following_count 合并成 follows.merged.json；纯本地不联网，默认只填空缺不覆盖已有值，终端按「第 1/2/3 步」输出并给最终 Summary（录屏友好）；留空=未知，未知不作为取关依据（与 FOR-36 口径一致）。pyproject 注册 console script，避免「文档里有命令但装不出来」
 - .mailmap：把早期提交邮箱映射到 GitHub 账号，修复贡献者显示 0 的问题
 - v0.2.x 开发中：每周节奏、社区渠道（QQ/Discord）计划
 

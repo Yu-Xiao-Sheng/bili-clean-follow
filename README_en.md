@@ -20,6 +20,8 @@ to unfollow.
   optional "unfollow list": one row per candidate, `mid <TAB> nickname`.
 - **Safe on Chinese Windows**: emoji nicknames no longer crash a GBK console,
   and CSV / unfollow-list files are utf-8-sig so Excel shows Chinese correctly.
+- **Companion tool `bili-merge`**: writes a signals.csv template with mid +
+  nickname already filled in, so you only type four numbers; fully offline.
 - **Neutral on missing data** — a follow with no signals is never auto-kept.
 - **No committed credentials**; works from a user-provided JSON export.
 
@@ -69,7 +71,24 @@ bili-clean follows.json --md report.md --csv report.csv --unfollow-list to-unfol
 
 How to produce follows.json: see [docs/getting-started.md](docs/getting-started.md).
 
-**Step 4 - optional local web report**
+**Step 4 - fill in the missing signals (optional, decides whether REMOVE is trustworthy)**
+
+A raw export only carries nickname + bio; recency and follower/following counts
+are missing, so the report can only rank the list. The bundled `bili-merge`
+closes that gap offline (no network, no API calls):
+
+```
+bili-merge follows.json --template signals.csv     # template, mid + nickname prefilled
+# type the four numbers per row in Excel / WPS (blank = unknown)
+bili-merge follows.json --signals signals.csv      # -> follows.merged.json
+bili-clean follows.merged.json --md report.md --csv report.csv --unfollow-list to-unfollow.txt
+```
+
+An empty cell means unknown - unknown is never used as a reason to unfollow, so
+those rows stay in review. Without the installed console script run
+`PYTHONPATH=src python -m bili.merge_cli`.
+
+**Step 5 - optional local web report**
 
 ```
 python -m bili.web --input sample-follows.json
