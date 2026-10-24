@@ -77,3 +77,39 @@ jobs:
           PYTHONPATH: src
         run: |
           pytest tests -q
+
+  # FOR-57：Web 报告的渲染层门禁（FOR-56 §5 验收口径）。
+  # 这条 job 存在的理由和 smoke-gbk 一样：单元测试全绿与「真实浏览器里页面不可读」
+  # 可以同时成立——tests/test_web.py 只看 HTTP 响应体（JSON / BOM / 状态码），
+  # 看不见昵称/信号/粉丝比渲染成 NaN，也看不见徽章 class 属性未闭合把整行吞掉。
+  # 这里起真服务 + headless chromium --dump-dom，断言落在渲染后的 DOM 上；
+  # BILI_REQUIRE_BROWSER=1 让「找不到浏览器」变成失败，门禁不会悄悄空跑。
+  web-render:
+    name: test - web report rendered in real chromium
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Install a headless chromium
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: DOM assertions (skip is a failure here)
+        env:
+          PYTHONPATH: src
+          BILI_REQUIRE_BROWSER: "1"
+        run: |
+          python -m pytest -q tests/test_web_render.py
+          python tools/probe_web_render.py
