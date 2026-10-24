@@ -27,11 +27,12 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 - **数据缺失按「未知」处理，不按「最差」处理**：分数只对已提供的信号归一化，再叠两道闸门——缺 recency 的记录不得判 remove（闸门 A），只有简介（哪怕写着「官方认证」）的记录不得判 keep（闸门 B），它们统统落到 review 等你确认。
 - **缺信号会被明确告知**：报告每行带 `signals_used` 与 `missing_signals`（已提供 / 未提供的信号名，分号连接，两者互补；CSV 存信号名，Markdown 与 Web 在没有任何信号时显示「未知」）；当本次运行超过一半记录缺 recency 时，Markdown 与 Web 报告顶部打一行警告，提示先用 `bili-merge` 补信号，否则结果不可作为取关依据。
 - **真实导出直接能跑**：浏览器复制的 `{"code":0,"data":{"follower":[…]}}` 或 `data.list` 响应会自动解包，昵称认 `name` / `uname`，官方认证认 `official.role/title/department` 与 `official_verify.type`，不用手改 JSON。
+- **带 BOM 的导出直接能读**：Windows 记事本 / Excel 另存的 JSON 带 UTF-8 BOM，输入按 utf-8-sig 解码，不会再看到 Unexpected UTF-8 BOM。
 - **不提交凭据**；基于用户提供的 JSON 导出工作。
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13；本轮实测 Python 3.13.15，149 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13；本轮实测 Python 3.13.15，218 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
@@ -41,7 +42,7 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 方式 A · 直接装 Release 包（不用克隆）：
 
 ```
-pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.1/bili-clean-follow-0.1.1.zip
+pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-follow-0.1.2.zip
 ```
 
 方式 B · 克隆后本地安装：
@@ -52,7 +53,7 @@ cd bili-clean-follow
 pip install -e .
 ```
 
-装好后可以确认一下：`bili-clean --version` 输出 `bili-clean 0.1.1`。
+装好后可以确认一下：`bili-clean --version` 输出 `bili-clean 0.1.2`。
 
 **第 2 步 · 跑内置示例**
 
@@ -92,7 +93,7 @@ bili-clean follows.merged.json --md report.md --csv report.csv --unfollow-list t
 python -m bili.web --input sample-follows.json
 ```
 
-打开 http://127.0.0.1:8787 （只监听 127.0.0.1，只读；页面顶部显示 `bili-clean-follow v0.1.1 · 本地只读 · 数据不出本机`）。
+打开 http://127.0.0.1:8787 （只监听 127.0.0.1，只读；页面顶部显示 `bili-clean-follow v0.1.2 · 本地只读 · 数据不出本机`）。
 
 ## 如何得分
 

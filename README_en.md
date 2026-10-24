@@ -25,11 +25,13 @@ to unfollow.
 - **Missing data means unknown, not worst-case**: the score is normalized over the signals you actually provided, then two gates apply - no recency signal means never REMOVE (gate A), a bio-only record means never KEEP (gate B). Those rows land in review for you to confirm.
 - **Missing signals are called out**: every row exports `signals_used` and `missing_signals` (complementary lists of signal names joined by `;`; the CSV stores the names, the Markdown and web reports render 未知 when nothing is known), and when at least half of the rows lack recency the Markdown and web reports show an explicit warning telling you to fill the signals with `bili-merge` first.
 - **Real exports load as-is**: a `"code":0,"data":{"follower":[…]}` or `data.list` response copied out of the browser is unwrapped automatically, nicknames come from `name` / `uname`, and official certification is read from `official.role/title/department` and `official_verify.type` - no hand-editing of the JSON.
+- **BOM-safe input**: an export saved by Windows Notepad or Excel (UTF-8 BOM) loads
+  without the confusing "Unexpected UTF-8 BOM" error.
 - **No committed credentials**; works from a user-provided JSON export.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13; verified locally on 3.13.15, 149 tests green).
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13; verified locally on 3.13.15, 218 tests green).
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 
@@ -41,7 +43,7 @@ ModuleNotFoundError: No module named 'bili'.
 Option A - install the release zip (no clone needed):
 
 ```
-pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.1/bili-clean-follow-0.1.1.zip
+pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-follow-0.1.2.zip
 ```
 
 Option B - clone, then install:
@@ -52,7 +54,7 @@ cd bili-clean-follow
 pip install -e .
 ```
 
-Sanity check: `bili-clean --version` prints `bili-clean 0.1.1`.
+Sanity check: `bili-clean --version` prints `bili-clean 0.1.2`.
 
 **Step 2 - run the built-in sample**
 
@@ -97,7 +99,7 @@ python -m bili.web --input sample-follows.json
 ```
 
 Open http://127.0.0.1:8787 (bound to 127.0.0.1 only, read-only; the page header shows
-`bili-clean-follow v0.1.1 · 本地只读 · 数据不出本机`).
+`bili-clean-follow v0.1.2 · 本地只读 · 数据不出本机`).
 
 ## Getting a real input
 Bilibili's public follow-list endpoint does not expose per-follow "last active"

@@ -9,6 +9,10 @@ FIXTURE = Path(__file__).resolve().parent / "fixture-follows.json"
 REPO_ROOT = FIXTURE.parent.parent
 SRC = REPO_ROOT / "src"
 
+sys.path.insert(0, str(SRC))
+
+from bili import __version__ as BILI_VERSION  # noqa: E402
+
 UTF8_ENV = dict(os.environ, PYTHONIOENCODING="utf-8")
 
 
@@ -89,7 +93,7 @@ def test_cli_unfollow_list_carries_manual_only_notice(tmp_path):
 def test_cli_version():
     out = run_cli("--version")
     assert out.returncode == 0
-    assert out.stdout.strip() == "bili-clean 0.1.1"
+    assert out.stdout.strip() == "bili-clean " + BILI_VERSION
     assert "%(prog)s" not in out.stdout  # regression: f-string bug (literal %%(prog)s)
 
 

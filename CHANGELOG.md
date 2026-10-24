@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 
-## [Unreleased]
+## [0.1.2] - 2026-10-24
 
 ### Changed
 - **打分口径：信号缺失按「未知」处理，不再按「最差」处理（FOR-36，v0.1.1 的行为是 bug）**：v0.1.1 把未提供的信号置为 0、权重和固定 1.0，「不知道」在数学上等于「最坏」，真实导出（只有 identity + bio）会一边倒跑成 `keep=0 review=0 remove=13`。现在只对已提供信号求加权平均（`score = Σ(w_k·p_k) / Σ(w_k)`，分母只含已提供信号的权重），并加两道硬闸门：闸门 A 缺 `recency` 不得判 remove（原因行 `downgraded to review: no recency signal`），闸门 B 只有简介不得判 keep。REVIEW_MIN / KEEP_MIN 保持 0.40 / 0.70 不变；仓库自带样例与 demo 的可复现输出不变（24 条样例每条都给满三个信号）
@@ -13,17 +13,22 @@ Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 
 ### Fixed
 - 真实导出识别（FOR-37）：`{"code":0,"data":{"follower":[…]}}` 与 `data.list` 信封会自动解包，浏览器里直接复制的关注列表响应不用再手工提到顶层；昵称认 `name` / `uname`，取关清单不再是一串空名字；官方认证改认 `official.role/title/department` 与 `official_verify.type > 0`（落到 `extra.official_*` 并进 relevance），不再只靠简介里有没有「官方」两个字——换个 bio 就不会掉认证。`official_verify.type` 为 0 / -1 视为无认证占位，不算认证证据；头像 `face` 落到 `extra.face`，人工核对时能用
-- Windows 中文控制台 P0（FOR-38）- Windows 中文控制台 P0（FOR-38）：昵称含 emoji 时 CLI / Web / demo 不再 UnicodeEncodeError 崩栈——入口统一 `bili.streams.harden_stdio()`，写 stdout 再兜一层，报告不会整份丢失
+- Windows 中文控制台 P0（FOR-38）：昵称含 emoji 时 CLI / Web / demo 不再 UnicodeEncodeError 崩栈——入口统一 `bili.streams.harden_stdio()`，写 stdout 再兜一层，报告不会整份丢失
 - CSV 与取关清单统一 utf-8-sig（带 BOM），Windows Excel / WPS / 记事本双击打开中文不再乱码；Markdown 仍为不带 BOM 的 utf-8（FOR-38）
 - 取关候选清单从「只有 mid 数字」改为 `mid <TAB> 昵称` + 说明抬头，CLI 与 Web `/unfollow` 共用同一份，并写明只用于人工核对、工具不会自动取关（FOR-38）
 - 凭据拦截改为内容优先：内容里真的出现 SESSDATA / bili_jct 等 cookie 键才拒绝并点名键名；只是文件名带 cookie 的正常导出改为放行 + 提示改名，拒绝信息附带改名建议（FOR-38）
 - 输入 JSON 以 utf-8-sig 读取，记事本 / Excel 另存带 BOM 的导出不再报解码错（FOR-38 顺带修掉 FOR-35 记录的 BOM 断层）
+- README.md / README_en.md 的测试条数口径修掉：旧值 63（后来漂到 149）与 main 上实际条数不符，现与 `python -m pytest -q` 的实际输出一致，Release 说明用同一个数（FOR-35）
+- 三处 Release zip 下载链接（README.md / README_en.md / docs/getting-started.md）与 `bili-clean --version` / Web 页面顶部版本串统一切到 v0.1.2，README 第一条命令不再把人装成旧版（FOR-35）
+- README.md / README_en.md 特性列表补「带 BOM 的导出直接能读」一条：v0.1.1 已有 utf-8-sig 读取但文档没写，Windows 用户看不到这个保证（FOR-35）
 - README 快速开始补安装步骤（首行就是 pip install，Release zip 或 pip install -e .），修掉「全新克隆直接跑 python -m bili.demo 就 ModuleNotFoundError」的落地页断层（FOR-32）；README.md / README_en.md / docs/getting-started.md 同步
 - Python 版本口径统一到 3.9+：pyproject、README、仓库描述一致；CI 矩阵扩到 3.9–3.13，并改用 pip install -e .[dev] 走用户真实安装路径
 - docs/getting-started.md 修复被转义吃掉的命令与文件名（report.md、to-unfollow.txt 等），并去掉「不用安装直接跑源码」的错误指引
 
 ### Added
 - `bili-merge` 补信号伴生工具（FOR-40）：`--template` 生成已预填 mid + 昵称的 signals.csv（utf-8-sig，Excel/WPS 直接编辑），`--signals` 把手工抄的 last_seen_days / last_video_days / follower_count / following_count 合并成 follows.merged.json；纯本地不联网，默认只填空缺不覆盖已有值，终端按「第 1/2/3 步」输出并给最终 Summary（录屏友好）；留空=未知，未知不作为取关依据（与 FOR-36 口径一致）。pyproject 注册 console script，避免「文档里有命令但装不出来」
+- 发布口径自检 `tests/test_release_hygiene.py`（FOR-35）：pyproject 版本必须等于 `bili.__version__`；CHANGELOG 必须有当前版本小节且不留 [Unreleased]；README.md / README_en.md / docs/getting-started.md 只允许出现当前版本的 Release zip 链接与 `bili-clean <ver>` 版本串；README 里写的 pytest 条数必须等于 `pytest --collect-only` 实际收集到的条数——「README 63 / Release 62」这类多口径从此跑不过测试
+- docs/getting-started.md 新增 §6「本地 Web 报告」：`python -m bili.web --input follows.json` + http://127.0.0.1:8787 + `--port`，英文上手文档不再只讲 CLI（FOR-35，周度复盘 2026-W43 §3）
 - .mailmap：把早期提交邮箱映射到 GitHub 账号，修复贡献者显示 0 的问题
 - v0.2.x 开发中：每周节奏、社区渠道（QQ/Discord）计划
 

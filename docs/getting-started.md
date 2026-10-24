@@ -8,7 +8,7 @@ The package uses a src/ layout, so on a fresh clone `python -m bili.cli ...` fai
 Option A - install the release zip (no clone):
 
 ```
-pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.1/bili-clean-follow-0.1.1.zip
+pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-follow-0.1.2.zip
 ```
 
 Option B - clone, then install in editable mode:
@@ -19,7 +19,7 @@ cd bili-clean-follow
 pip install -e .
 ```
 
-Sanity check: `bili-clean --version` prints `bili-clean 0.1.1`.
+Sanity check: `bili-clean --version` prints `bili-clean 0.1.2`.
 
 If you would rather not install, run everything from the source tree with
 `PYTHONPATH=src` (Windows: `set PYTHONPATH=src`). That is exactly what CI does.
@@ -119,7 +119,29 @@ This tool does not touch your account. Each to-unfollow.txt row is `mid <TAB> ni
 (search the nickname on your follows page), and report.csv is utf-8-sig so Excel /
 WPS on Windows opens it without mojibake.
 
-## 6. How scoring works
+## 6. Optional: the local web report
+
+If you would rather click than read terminal output, the same input file feeds a
+read-only local report (v0.1.1+, no extra dependencies):
+
+```
+python -m bili.demo                            # only if you have no follows.json yet
+python -m bili.web --input follows.json
+```
+
+Open http://127.0.0.1:8787 - the server binds to 127.0.0.1 only, there is no upload
+endpoint and nothing is written to disk. The page header reads
+`bili-clean-follow v0.1.2 · 本地只读 · 数据不出本机` and gives you:
+
+- summary cards: total follows plus the keep / review / remove counts and shares;
+- the full classified table, filterable by tab and sortable by any column;
+- a delete-candidate preview you confirm one by one, exported as .txt (`mid <TAB> nickname`);
+- one-click Markdown / CSV export (CSV carries a UTF-8 BOM for Excel / WPS).
+
+If 8787 is already taken, move it: `python -m bili.web --input follows.json --port 8899`.
+Without the installed package run `PYTHONPATH=src python -m bili.web --input follows.json`.
+
+## 7. How scoring works
 
 See [docs/scoring-model.md](scoring-model.md) and [docs/spec.md](spec.md) for the weights,
 signals and thresholds. Tweak WEIGHTS, REVIEW_MIN and KEEP_MIN in src/bili/score.py if
