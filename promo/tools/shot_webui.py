@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """用当前版本的真实 Web 报告界面重截 promo/public/webui.png。
 
-片子里那张「本地报告」截图必须是当前版本渲染出来的，否则视频讲的就是过时界面。
-纯本地：起 bili.web（只监听 127.0.0.1），用本机 Chrome / Edge headless 截图，截完停服务。
-
-用法：
-    python tools/shot_webui.py [输入JSON] [--browser 路径] [--port 8795]
-
-不传输入时用 tests/fixture-bili-real-list.json 经 bili-merge 补信号后的结果，
-这样界面上 keep / review / remove 三类都有内容，镜头里不至于空一半。
+片子里那张「本地报告」截图必须是当前版本渲染出来的，而且必须是**真的能看**的。
+v0.1.2（tag = 4a229ce）的 web.py 在真实浏览器里把昵称 / 信号 / 粉丝比三列渲染成字面量
+NaN，分类徽章的 span 又缺一个属性闭合引号，整行塌成转义文本（FOR-56 取证、FOR-57 修）。
+那种页面照样能截出一张图，但放进片子里就是替产品演示一个坏掉的界面。
+所以这里先抓一次真实浏览器渲染后的 DOM 做断言：不合格就不出图，退出码 3。
 """
 from __future__ import annotations
 
@@ -24,6 +21,9 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]          # promo/
+REPO_ROOT = ROOT.parent
+sys.path.insert(0, str(REPO_ROOT / "src"))            # ??????????
+from bili import web as bili_web                     # noqa: E402
 REPO = ROOT.parent                                   # 仓库根
 PUBLIC = ROOT / "public"
 OUT = PUBLIC / "webui.png"
@@ -90,6 +90,58 @@ def build_demo_input(tmp: Path) -> Path:
     return merged
 
 
+def fetch_dom(browser: str, port: int) -> str:
+    """抓真实浏览器渲染后的 DOM（不是响应体）：前端 JS 跑过才算数。"""
+    res = subprocess.run([browser, "--headless=new", "--disable-gpu", "--dump-dom",
+                          "--virtual-time-budget=4000", f"http://127.0.0.1:{port}/"],
+                         capture_output=True)
+    if res.returncode != 0:
+        sys.exit(f"浏览器 --dump-dom 失败 exit={res.returncode}: "
+                 f"{res.stderr.decode('utf-8', 'replace')[:300]}")
+    return res.stdout.decode("utf-8", "replace")
+
+
+def tbody_of(dom: str) -> str:
+    start, end = dom.find("<tbody"), dom.find("</tbody>")
+    if start < 0 or end < 0:
+        return ""
+    return dom[start:end]
+
+
+def check_dom(dom: str, results: list) -> list:
+    """对渲染层下断言。返回问题清单，空清单 = 这张图有资格进片子。
+
+    失效模式来自 FOR-56 取证 / FOR-57 修复：昵称列被 fmtNum 覆盖成字面量 NaN，
+    分类徽章的 span 缺属性闭合引号，导致后面所有列塌成转义文本。
+    两种坏法都还能截出一张「像样」的图，所以只能靠 DOM 断言拦，肉眼抽查拦不住。
+    """
+    body = tbody_of(dom)
+    if not body:
+        return ["页面没有渲染出 <tbody>：前端 JS 没跑起来，截图会是空表"]
+
+    problems = []
+    rows = body.count("<tr")
+    if rows != len(results):
+        problems.append(f"表格渲染 {rows} 行 != 数据 {len(results)} 行（行被吞或塌成文本）")
+    if "NaN" in body:
+        problems.append("tbody 出现字面量 NaN：某一列把原值覆盖成了转换值")
+    for frag in ("&lt;td", "&lt;/td", "&lt;span", "&gt;"):
+        if frag in body:
+            problems.append(f"tbody 出现被转义的标签 {frag}：属性缺闭合引号，后面的列被吞进 class")
+            break
+
+    badges = sum(body.count(f'class="b-{cls}') for cls in ("keep", "review", "remove"))
+    if badges != rows:
+        problems.append(f"分类徽章 {badges} 个 != {rows} 行：徽章 span 未闭合，颜色与文案都不会生效")
+
+    counts = bili_web.summarize(results)["counts"]
+    for cls in ("keep", "review", "remove"):
+        shown = body.count(f'class="{cls}"')
+        if shown != counts[cls]:
+            problems.append(f"{cls} 行 {shown} != Summary {counts[cls]}：分类行渲染不完整")
+    return problems
+
+
 def wait_until_up(port: int, timeout: float = 12.0) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -123,6 +175,20 @@ def main() -> int:
     try:
         if not wait_until_up(port):
             sys.exit("bili.web 没起来，检查 --input 是否是可加载的导出")
+        dom = fetch_dom(browser, port)
+        try:
+            results = bili_web.load_report(str(payload))
+        except Exception as exc:                       # noqa: BLE001
+            sys.exit(f"?????????????: {exc}")
+        problems = check_dom(dom, results)
+        if problems:
+            print(f"[FAIL] ?? src/bili ? Web ?????????????????")
+            for item in problems:
+                print("  - " + item)
+            print("??????? FOR-57????????"
+                  "?????? Web ???????????????")
+            raise SystemExit(3)
+        print(f"[OK] DOM ???????{len(results)} ?????? NaN??? span ???")
         subprocess.run([browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                         "--force-device-scale-factor=1", f"--window-size={args.size}",
                         "--virtual-time-budget=4000", f"--screenshot={OUT}",
@@ -140,3 +206,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

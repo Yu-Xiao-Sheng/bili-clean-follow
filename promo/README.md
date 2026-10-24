@@ -74,3 +74,31 @@ python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pill
 - 界面截图：`tools/shot_webui.py` 从当前 `src/bili` 起服务 + 本机 Chrome headless 截图，版本一换就能重截，不会再出现「片子讲 v0.1.1 界面」。
 - 待补：品牌 logo 动效（当前色板取自 B站主色 `00A1D6` + 深色 `0B0D12`）；Web 报告从静态截图换成录屏滚动会更有说服力。
 - 成片挂载：发版时把两支 mp4 传到 Release 附件（crf 20 下约 7–9 MB，在 GitHub 10 MB 附件上限内）。
+
+## Web 镜头的门禁（先看这条，再决定片子能不能发）
+
+`public/webui.png` 是唯一一张「本地 Web 报告」实拍，出现在产品介绍片的 WebScene 和使用教程片的 STEP 5。
+它必须来自**当前真的能看的界面**，否则片子就是在替产品演示一个坏掉的界面。
+
+实测（2026-10-25，Windows / Chrome headless，`--dump-dom` 读渲染后的 DOM，不是响应体）：
+
+| 构建 | tbody 里的真实输出 | 结论 |
+|---|---|---|
+| `main = 10ca868`（= tag v0.1.2） | `<td>NaN</td>`，`<span class="b-review&gt;review&lt;/span&gt;&lt;/td&gt;...` | 昵称 / 信号 / 粉丝比三列全是字面量 `NaN`，徽章 span 缺属性闭合引号 → 后面所有列塌成转义文本。不可入镜 |
+| `54e1b8a`（FOR-57 + FOR-58 堆叠分支） | `<td>人民日报</td><td><span class="b-review">review</span></td>...` | 20 行、20 个徽章、无 `NaN`、无转义标签。可入镜 |
+
+所以 `tools/shot_webui.py` 现在在截图前先跑一次真实浏览器 DOM 断言（行数 = 数据行数、tbody 不得出现
+`NaN` 或被转义的标签、徽章数量 = 行数、每个分类的行数 = Summary 计数）。断言不过就不出图、退出码 3。
+在 `main = 10ca868` 上跑它是红的（退出码 3，两条问题），这正是 v0.1.2 界面真实的渲染状态。
+
+**发布前置**：本分支的 `webui.png` 来自 `54e1b8a`（含 FOR-57 的渲染层 P0 修复与 FOR-58 的数值列排序）。
+FOR-57 → FOR-58 合入 main 并切 v0.1.3 之前，两支片子的 Web 镜头与 STEP 5 都不适用于已发布的 v0.1.2，
+发帖物料只能先用不含 Web 镜头的版本。
+
+### 重截与重渲（改完 web.py 必须重跑）
+
+```
+python promo/tools/shot_webui.py            # DOM 断言通过才写 public/webui.png
+cd promo && npm run render && npm run render:walk
+python promo/qa.py promo/out/promo/*.png    # 帧级：空白帧 / 触边
+```
