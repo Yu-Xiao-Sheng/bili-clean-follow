@@ -1,4 +1,5 @@
 """Tests for bili.export: run() / to_markdown() / to_csv()."""
+import re
 import sys
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from bili.export import (CSV_ENCODING, MISSING_RECENCY_WARN_RATIO, TEXT_ENCODING
                      recency_remove_violations,
                      run, signal_display, signal_warning,
                      to_markdown, to_csv, to_unfollow_list,
-                     unfollow_rows, _clean_pipe)
+                     unfollow_rows, _clean_pipe, _html_escape, _md_cell)
 from bili.model import FollowRecord
 
 
@@ -316,3 +317,60 @@ class TestMissingSignalsColumn:
                                 "last_video_days": None}) is True
         assert recency_missing({"class": "remove", "last_seen_days": 400.0,
                                 "last_video_days": None}) is False
+
+
+class TestMarkdownCellSafety:
+    """FOR-58 W-3/W-4：昵称里的竖线 / HTML / 换行不得改变 Markdown 表格形状。"""
+
+    @staticmethod
+    def pipes(line):
+        r"""数没被转义的竖线（`\|` 是内容，不是列分隔符）。"""
+        return len(re.findall(r"(?<!\\)\|", line))
+
+    def test_nickname_with_pipes_keeps_the_table_shape(self):
+        res = run([keep_rec("阿|巴|卡"), keep_rec("x | y")])
+        md = to_markdown(res)
+        lines = [ln for ln in md.splitlines() if ln.startswith("|")]
+        # 三组各一份表头 + 分隔行，再加两条数据行
+        assert len(lines) == 8, lines
+        for line in lines:
+            assert self.pipes(line) == 8, line
+        assert "阿\\|巴\\|卡" in md
+
+    def test_html_metachars_in_nickname_are_escaped(self):
+        res = run([keep_rec('<img src=x onerror="alert(1)">'),
+                   keep_rec("<script>alert(2)</script>")])
+        md = to_markdown(res)
+        assert "<img" not in md and "<script" not in md
+        assert "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;" in md
+
+    def test_markdown_reuses_the_web_escape_not_a_second_copy(self):
+        from bili import web
+        assert web._html_escape is _html_escape, \
+            "HTML 转义只能有一份实现（FOR-58 验收 2：不要造第二份）"
+        assert _md_cell("<a>&|") == _clean_pipe(_html_escape("<a>&|"))
+
+    def test_newline_and_tab_in_nickname_do_not_split_the_row(self):
+        res = run([keep_rec("第一行\n第二行\t第三行")])
+        md = to_markdown(res)
+        assert "第一行 第二行 第三行" in md
+        for line in [ln for ln in md.splitlines() if ln.startswith("| ")]:
+            assert self.pipes(line) == 8, line
+
+    def test_backslash_in_nickname_does_not_unescape_the_pipe(self):
+        res = run([keep_rec("a\\|b")])
+        md = to_markdown(res)
+        row = [ln for ln in md.splitlines() if ln.startswith("| 1 | ")][0]
+        assert self.pipes(row) == 8, row
+
+    def test_empty_nickname_still_makes_a_valid_row(self):
+        res = run([keep_rec("")])
+        md = to_markdown(res)
+        for line in [ln for ln in md.splitlines() if ln.startswith("| ")]:
+            assert self.pipes(line) == 8, line
+
+    def test_csv_stays_the_raw_data_layer(self):
+        res = run([keep_rec("a|b")])
+        csv_text = to_csv(res)
+        assert "a|b" in csv_text
+        assert "\\|" not in csv_text, "CSV 是数据层，不该掺显示层的转义"
