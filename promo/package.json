@@ -1,0 +1,24 @@
+{
+  "name": "bili-clean-follow-promo",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render BiliCleanPromo out/bili-clean-promo.mp4 --crf=20",
+    "render:walk": "remotion render Walkthrough out/bili-clean-walkthrough.mp4 --crf=20",
+    "render:master": "npm run render && npm run render:walk",
+    "still:promo": "remotion still BiliCleanPromo out/promo-frame.png --frame",
+    "still:walk": "remotion still Walkthrough out/walk-frame.png --frame"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.246",
+    "remotion": "4.0.246",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "typescript": "5.6.3"
+  },
+  "description": "Remotion project for the bili-clean-follow product & walkthrough videos"
+}
