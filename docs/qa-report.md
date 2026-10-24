@@ -55,3 +55,44 @@ python -m bili.demo                    # 生成 sample-follows.json
 bili-clean sample-follows.json --md report.md --csv report.csv --unfollow-list uf.txt
 bili-clean --version                   # bili-clean 0.1.0
 ```
+
+---
+
+## 七、v0.1.2 轮验收补充（FOR-41 · 2026-10-24 · 全栈开发）
+
+上面一~六节是 v0.1.0 的记录，验收口径以本节为准。当时那 53 项（现 230 项）测试全部用自定义形状 fixture（`follower_id / nickname / bio`，且三个信号齐全）——所以「测试全绿」从来不覆盖真实用户的第一条命令。这就是本轮的主结论。
+
+### 7.1 失败项：真实数据首跑不可用
+
+复现条件：`main=1d2629a`、干净 venv、Python 3.13.15，只造数据、未碰真实账号（FOR-34 实测，CTO 与运营各自独立复跑过同一组数字）。
+
+| # | 用户看到什么 | 根因 | 状态 |
+|---|---|---|---|
+| F1 | 按 docs/getting-started.md §3 把 Network 响应原样存盘再跑 CLI → `exit=2`，`Could not find a list of follows in the JSON`（`data.follower` 与 `data.list` 两种包装都不认） | `loaders._to_list` 只在已知 key 里取一层，不下探 `code/message/data` | ✅ FOR-37 已修；回归 `tests/test_loaders.py` + `tests/test_acceptance_real_shapes.py::test_real_api_response_runs_and_every_row_has_a_name` |
+| F2 | 把数组手工提到顶层绕过 F1 → 报告 20 行 Name 列全空、CSV nickname 全空 | `model.from_dict` 只认 `nickname/follower_name`，不认 B 站真实字段 `name` / `uname`；`official.*` 整块丢弃 | ✅ FOR-37 已修（`name`/`uname`→nickname、`sign`→bio、`face`/`official_*`→extra 并喂 relevance）；回归同上：CSV 20 行昵称全非空 |
+| F3 | 13 条只有 identity+bio 的最小导出 → `Summary: keep=0 review=0 remove=13` | `score.py` 把「未提供的信号」按 0.0 计入固定权重，未知＝最差，天花板 0.25 < REVIEW_MIN | ✅ FOR-36 已修（按已提供信号归一化 + 闸门 A 缺 recency 不得 remove、闸门 B 只有 bio 不得 keep）；回归 `tests/test_unknown_signals.py` + 本文件 (b) |
+| F4 | 昵称含 emoji 时，中文（GBK）控制台跑 CLI 直接 `UnicodeEncodeError` 崩栈，整份报告丢失 | 入口没有 reconfigure stdio；CI 只有 ubuntu + UTF-8，这条路径永远抓不到 | ✅ FOR-38 已修（`bili.streams.harden_stdio()` + 写入兜底）；回归 `tests/test_streams.py` + 端到端 GBK 冒烟 + `ci.yml` 的 `smoke-gbk` job |
+| F5 | CSV 无 BOM，Excel / WPS 双击打开中文乱码；取关清单只有 mid 没有名字 | 写文件用 utf-8 而非 utf-8-sig；清单未带昵称 | ✅ FOR-38 已修；回归断言 CSV 首三字节 = `EF BB BF`，取关清单每行 `mid <TAB> 昵称` |
+
+### 7.2 修完后的期望 Summary（本轮实测原文：`main=4a229ce`，Python 3.13.15）
+
+```
+python -m bili tests/fixture-bili-real.json --csv out.csv --unfollow-list out.txt
+Summary: keep=0 review=20 remove=0     # 真实接口原始响应（data.follower，含 emoji 昵称）
+
+python -m bili tests/fixture-minimal.json --csv out.csv
+Summary: keep=0 review=13 remove=0     # 只有 identity+bio：一律 review，stderr 打缺信号警告
+
+python -m bili tests/fixture-full-signals.json --csv out.csv
+Summary: keep=1 review=1 remove=4      # 补齐信号后取关判定仍然成立
+```
+
+这三行已钉成端到端断言（`tests/test_acceptance_real_shapes.py`，12 项，跑 CLI 子进程而不是单元测试）。要改期望，先改这个文件。
+
+### 7.3 验收口径收紧（防再次「测试全绿但产品不可用」）
+
+1. **fixture 必须分层**：(a) 真实接口原始响应（`code/message/data.follower`、中文与 emoji 昵称、`official`）；(b) 只有 identity+bio 的最小导出；(c) 补全信号的导出。另有两条防呆测试（`test_real_shape_fixtures_keep_bilibili_envelope_and_fields`、`test_minimal_fixture_really_lacks_every_signal`）：谁把夹具改回「方便但假」的自定义形状，测试直接红。
+2. **跨单不变量进 CI**：任一行 `missing_signals` 含 `recency` 则该行 `class` 不得为 `remove`（ADR r2 闸门 A 的导出层镜像），四份 fixture 全部纳入参数化断言。
+3. **平台维度**：`ci.yml` 新增 `smoke-gbk` job（`windows-latest`，`PYTHONIOENCODING=gbk` + `PYTHONUTF8=0`，跑 CLI 冒烟 + CSV 昵称非空 + Windows 上全量 pytest）。⇒ 口径变化：CI 由 1 个 job（5 个 python 版本）变成 2 个 job，「五个 CI job 全绿」的说法作废，以后统一写「test 矩阵 3.9–3.13 + windows GBK smoke」。
+4. **测试数量口径**：README / README_en / Release 说明一律写当次 `python -m pytest -q` 的实际条数，本轮 = **230 passed**（218 + 12）。这条已由 `tests/test_release_hygiene.py::test_stated_test_count_matches_the_real_suite` 钉死，README 里的数字与真实收集数不一致时 CI 直接红。
+5. **仍开放（不在本轮）**：FOR-39 的三处报告可读性问题（reason 打成 Python list repr、全英文、remove 未按分数升序）在 `4a229ce` 上仍然存在，排 v0.1.3 第一批；FOR-34 使用与产品视频按 board 指令继续挂起。

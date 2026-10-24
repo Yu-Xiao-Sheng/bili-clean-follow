@@ -7,6 +7,7 @@ on:
 
 jobs:
   test:
+    name: test - Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -34,6 +35,44 @@ jobs:
           pip install -e .[dev]
 
       - name: Run tests
+        env:
+          PYTHONPATH: src
+        run: |
+          pytest tests -q
+
+  # FOR-41：真实导出形状 + Windows 中文控制台（GBK）的端到端冒烟。
+  # 这条 job 存在的理由：ubuntu + UTF-8 的单元测试全绿，真实用户仍然拿到
+  # 「昵称全空 + emoji 昵称崩栈」（FOR-34 在 main=1d2629a 上的实测）。
+  # 那类 bug 只能在真 Windows 上撞到，所以把它钉成 CI 门禁。
+  smoke-gbk:
+    name: smoke - real export shape on a Windows GBK console
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      # PYTHONUTF8=0 必须显式写：Windows 上 Python 3.15 起默认开 UTF-8 mode，
+      # 不写这一行，PYTHONIOENCODING=gbk 会被盖掉，job 永远绿但真机照样崩。
+      - name: CLI smoke on the real Bilibili response shape (GBK stdout)
+        env:
+          PYTHONPATH: src
+          PYTHONIOENCODING: gbk
+          PYTHONUTF8: "0"
+        run: |
+          python -m bili tests/fixture-bili-real.json --csv out.csv --unfollow-list out-unfollow.txt
+          python -c "import csv,io,sys; rows=list(csv.DictReader(io.open('out.csv',encoding='utf-8-sig'))); sys.exit(0 if len(rows)==20 and all((r.get('nickname') or '').strip() for r in rows) else 1)"
+
+      - name: Full suite on Windows
         env:
           PYTHONPATH: src
         run: |

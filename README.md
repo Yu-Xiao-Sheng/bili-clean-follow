@@ -32,7 +32,7 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13；本轮实测 Python 3.13.15，218 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job；本轮实测 Python 3.13.15，230 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**

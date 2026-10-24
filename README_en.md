@@ -31,7 +31,7 @@ to unfollow.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13; verified locally on 3.13.15, 218 tests green).
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job; verified locally on 3.13.15, 230 tests green).
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 
