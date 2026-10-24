@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig, Easing } from "remotion";
+import { AbsoluteFill, Audio, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig, Easing } from "remotion";
 import {
   ACCENT, BG, Bar, Counter, DIM, Eyebrow, Fade, FG, FONT_STACK, KEEP, LINE,
   MONO_STACK, PANEL, PANEL_2, Pop, REVIEW, Stage, Stat, TermLine, Window, WARN,
@@ -430,6 +430,8 @@ export const PromoV2: React.FC = () => {
           <C />
         </Seg>
       ))}
+      {/* 本地合成音轨（tools/gen_bgm.mjs），无第三方素材 */}
+      <Audio src={staticFile("audio/bgm-promo.wav")} volume={0.55} />
       <AbsoluteFill
         style={{
           pointerEvents: "none",

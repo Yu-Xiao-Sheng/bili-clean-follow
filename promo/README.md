@@ -14,12 +14,16 @@ npm run studio                 # 浏览器里实时预览（默认 :3000）
 npm run render                 # 产品介绍片 -> out/bili-clean-promo.mp4（1920x1080 @30fps）
 npm run render:walk            # 使用教程片 -> out/bili-clean-walkthrough.mp4
 npm run render:master          # 两支一起出
+npm run bgm                    # 只重新生成音轨（render 已自动带上这一步）
 npm run still:promo -- --frame=550 --out=out/x.png   # 单帧校对排版与中文字形
 npx remotion still Walkthrough out/w.png --frame=1020
+python tools/shot_webui.py     # 用当前 src/bili 的界面重截 webui.png
 python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pillow）
 ```
 
 `--crf=20` 已写进 render 脚本：53–62 秒的 1080p30 成片压在 GitHub Release 附件 10 MB 上限内。
+音轨由 `tools/gen_bgm.mjs` 本地合成（和弦垫 + 琶音 + 轻 kick + hat，master 归一化），
+时长精确对齐成片帧数；`public/audio/*.wav` 不提交，`npm run render` 会先生成。
 
 ## 两支成片（口径对齐 v0.1.2）
 
@@ -64,8 +68,9 @@ python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pill
 
 改代码前后请重跑上面三条命令，别让片子讲一个已经过时的版本。
 
-## 待补
+## 已完成 / 待补
 
-- 音轨 / 配音：仍未加 BGM（避免版权风险）；如需配乐，用 `promo/tools/gen_bgm.mjs` 那条路子生成合成音轨，不要抓现成歌曲。
-- 品牌动效：当前色板取自 B站主色 `00A1D6` + 深色 `0B0D12`，logo 动效待 UX/UI 出稿。
-- 可选：把 Web 报告截图换成录屏滚动，比静态 `webui.png` 更有说服力。
+- 音轨：`tools/gen_bgm.mjs` 本地合成（和弦垫 + 琶音 + 轻 kick + hat），两支各一条、时长精确对齐帧数，零版权风险；真人配音仍未录。
+- 界面截图：`tools/shot_webui.py` 从当前 `src/bili` 起服务 + 本机 Chrome headless 截图，版本一换就能重截，不会再出现「片子讲 v0.1.1 界面」。
+- 待补：品牌 logo 动效（当前色板取自 B站主色 `00A1D6` + 深色 `0B0D12`）；Web 报告从静态截图换成录屏滚动会更有说服力。
+- 成片挂载：发版时把两支 mp4 传到 Release 附件（crf 20 下约 7–9 MB，在 GitHub 10 MB 附件上限内）。

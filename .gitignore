@@ -56,3 +56,4 @@ signals*.csv
 # promo（Remotion 视频工程）：源码提交，产物不提交
 promo/out/
 promo/.remotion/
+promo/public/audio/

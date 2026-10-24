@@ -4,8 +4,9 @@
   "version": "0.0.1",
   "scripts": {
     "studio": "remotion studio",
-    "render": "remotion render BiliCleanPromo out/bili-clean-promo.mp4 --crf=20",
-    "render:walk": "remotion render Walkthrough out/bili-clean-walkthrough.mp4 --crf=20",
+    "bgm": "node tools/gen_bgm.mjs",
+    "render": "node tools/gen_bgm.mjs && remotion render BiliCleanPromo out/bili-clean-promo.mp4 --crf=20",
+    "render:walk": "node tools/gen_bgm.mjs && remotion render Walkthrough out/bili-clean-walkthrough.mp4 --crf=20",
     "render:master": "npm run render && npm run render:walk",
     "still:promo": "remotion still BiliCleanPromo out/promo-frame.png --frame",
     "still:walk": "remotion still Walkthrough out/walk-frame.png --frame"

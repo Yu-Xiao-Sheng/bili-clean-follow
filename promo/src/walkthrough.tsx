@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, Easing } from "remotion";
+import { AbsoluteFill, Audio, Img, interpolate, staticFile, useCurrentFrame, Easing } from "remotion";
 import {
   ACCENT, BG, Bar, DIM, Eyebrow, Fade, FG, KEEP, LINE, MONO_STACK, PANEL,
   PANEL_2, Stage, Stat, TermLine, Window, WARN, REVIEW,
@@ -454,6 +454,8 @@ export const Walkthrough: React.FC = () => {
           </WalkSeg>
         );
       })}
+      {/* 本地合成音轨（tools/gen_bgm.mjs），教程片里压得更低 */}
+      <Audio src={staticFile("audio/bgm-walk.wav")} volume={0.42} />
       <AbsoluteFill style={{ pointerEvents: "none", justifyContent: "flex-end", padding: 40 }}>
         <div style={{ fontFamily: MONO_STACK, fontSize: 22, color: "#455063" }}>
           bili-clean-follow · 使用教程 · v0.1.2
