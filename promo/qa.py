@@ -1,5 +1,5 @@
 from PIL import Image
-import sys, glob
+import sys, glob, os
 
 BG = (11, 13, 18)
 
@@ -20,7 +20,14 @@ def analyze(path):
                 if y > maxy: maxy = y
     return w, h, (minx, miny, maxx, maxy), diffcount
 
-for p in sorted(sys.argv[1:]):
+paths = []
+for arg in sys.argv[1:]:
+    if os.path.isdir(arg):                      # 收目录：抽帧目录直接扔进来
+        paths.extend(glob.glob(os.path.join(arg, "*.png")))
+    else:
+        paths.extend(sorted(glob.glob(arg)))
+
+for p in sorted(paths):
     w, h, bb, n = analyze(p)
     flags = []
     if n < 200:
@@ -28,3 +35,5 @@ for p in sorted(sys.argv[1:]):
     if bb[0] < 18 or bb[1] < 18 or bb[2] > w - 18 or bb[3] > h - 18:
         flags.append("TOUCHES_EDGE")
     print("%-16s %dx%d bbox=%s ink=%d %s" % (p.split('/')[-1], w, h, bb, n, " ".join(flags)))
+
+

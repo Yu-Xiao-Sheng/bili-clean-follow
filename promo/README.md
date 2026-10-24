@@ -15,8 +15,8 @@ npm run render                 # 产品介绍片 -> out/bili-clean-promo.mp4（1
 npm run render:walk            # 使用教程片 -> out/bili-clean-walkthrough.mp4
 npm run render:master          # 两支一起出
 npm run bgm                    # 只重新生成音轨（render 已自动带上这一步）
-npm run still:promo -- --frame=550 --out=out/x.png   # 单帧校对排版与中文字形
-npx remotion still Walkthrough out/w.png --frame=1020
+npm run still:promo -- --frame=550 --out=out/x.png   # 不要用：见下方「帧级质检」
+# npx remotion still Walkthrough out/w.png --frame=1020   # 同上，别用
 python tools/shot_webui.py     # 用当前 src/bili 的界面重截 webui.png
 python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pillow）
 ```
@@ -102,3 +102,18 @@ python promo/tools/shot_webui.py            # DOM 断言通过才写 public/webu
 cd promo && npm run render && npm run render:walk
 python promo/qa.py promo/out/promo/*.png    # 帧级：空白帧 / 触边
 ```
+
+## 帧级质检（出片后必跑）
+
+`remotion still` 在这个工程里不可靠：实测（Remotion 4.0.246）对 BiliCleanPromo 用
+`--frame=800`、`--frame=230`、不带 `--frame` 三种方式抽出来的 PNG **字节完全相同**，画面只剩页脚一条
+（ink=174，qa.py 判 BLANK）——它在画面挂载前就抓帧了。所以「单帧校对」不能再用它，改成从成片里抽帧：
+
+```
+node tools/frames.mjs out/bili-clean-promo.mp4       out/frames/promo   # 每秒 1 帧
+node tools/frames.mjs out/bili-clean-walkthrough.mp4 out/frames/walk    # 每秒 1 帧
+python qa.py out/frames/promo out/frames/walk                           # qa.py 直接收目录
+```
+
+qa.py 报 BLANK（ink < 200）或 TOUCHES_EDGE（内容贴到 1080 画布边缘）就退回排版重做。
+本轮实测：58 + 62 = 120 个抽样帧，0 BLANK、0 TOUCHES_EDGE，最小 ink=915。
