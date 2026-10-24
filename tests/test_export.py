@@ -5,7 +5,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bili.export import (CSV_ENCODING, MISSING_RECENCY_WARN_RATIO, TEXT_ENCODING,
-                     missing_recency_count, run, signal_warning,
+                     UNKNOWN_SIGNAL_LABEL, missing_recency_count, recency_missing,
+                     recency_remove_violations,
+                     run, signal_display, signal_warning,
                      to_markdown, to_csv, to_unfollow_list,
                      unfollow_rows, _clean_pipe)
 from bili.model import FollowRecord
@@ -57,12 +59,16 @@ class TestRun:
         r = run([rec()])[0]
         assert r["class"] == "review"
         assert r["score"] == 0.0
-        assert r["signals_used"] == 0
+        # ADR r2 §3.4：signals_used 是信号名列表（分号连接），全缺时是空串。
+        assert r["signals_used"] == ""
+        assert r["missing_signals"] == "recency;authority;relevance"
 
     def test_full_signal_stale_is_still_removed(self):
         r = run([stale_rec()])[0]
         assert r["class"] == "remove"
-        assert r["signals_used"] == 2  # recency + authority, empty bio
+        # 简介为空 -> relevance 缺；两个已提供信号按名字露出。
+        assert r["signals_used"] == "recency;authority"
+        assert r["missing_signals"] == "relevance"
 
     def test_reason_is_list(self):
         r = run([keep_rec()])[0]
@@ -128,7 +134,8 @@ class TestToMarkdown:
         assert "1.00" in md
         # verify the score cell of the keep row shows two decimals
         row = [ln for ln in md.splitlines() if ln.startswith("| 1 | a |")][0]
-        assert "| 1 | a | 1.00 | 2 |" in row  # score + signals_used
+        # score + 信号名列表（MD 显示层不翻译信号名）
+        assert "| 1 | a | 1.00 | recency;authority |" in row
 
 
 class TestToCsv:
@@ -137,7 +144,7 @@ class TestToCsv:
         rows = csv_rows(to_csv(res))
         assert rows[0] == ("follower_id,nickname,class,score,last_seen_days,"
                            "last_video_days,follower_count,following_count,"
-                           "signals_used")
+                           "signals_used,missing_signals")
         assert len(rows) == 3  # header + 2 rows
 
     def test_none_fields_blank(self):
@@ -207,13 +214,30 @@ class TestSignalsUsedColumn:
 
     def test_every_row_has_signals_used(self):
         res = run([keep_rec("a"), rec("b"), stale_rec("c")])
-        assert [r["signals_used"] for r in res] == [2, 0, 2]
+        assert [r["signals_used"] for r in res] == [
+            "recency;authority", "", "recency;authority"]
+        assert [r["missing_signals"] for r in res] == [
+            "relevance", "recency;authority;relevance", "relevance"]
+
+    def test_signals_used_and_missing_are_complementary(self):
+        # ADR r2 §3.4：两列互补、互不相交，并集永远是全集。
+        full = set(("recency", "authority", "relevance"))
+        for r in run([keep_rec("a"), rec("b"), stale_rec("c"), rec("d", bio="简介")]):
+            used = set(x for x in r["signals_used"].split(";") if x)
+            missing = set(x for x in r["missing_signals"].split(";") if x)
+            assert used & missing == set()
+            assert used | missing == full
 
     def test_signals_used_is_a_csv_column(self):
+        # 按列名取列（ADR r2 §5：不许硬编码列位置，列还会继续加）。
         rows = csv_rows(to_csv(run([keep_rec("a"), rec("b")])))
-        assert rows[0].split(",")[-1] == "signals_used"
-        assert rows[1].split(",")[-1] == "2"
-        assert rows[2].split(",")[-1] == "0"
+        header = rows[0].split(",")
+        used = header.index("signals_used")
+        missing = header.index("missing_signals")
+        assert rows[1].split(",")[used] == "recency;authority"
+        assert rows[1].split(",")[missing] == "relevance"
+        assert rows[2].split(",")[used] == ""
+        assert rows[2].split(",")[missing] == "recency;authority;relevance"
 
 
 class TestMissingSignalWarning:
@@ -251,3 +275,44 @@ class TestMissingSignalWarning:
     def test_markdown_omits_the_warning_when_signals_are_fine(self):
         md = to_markdown(run([keep_rec("a"), stale_rec("b")]))
         assert "missing-signal warning" not in md
+
+
+class TestMissingSignalsColumn:
+    """ADR r2 §3.4 / §4：missing_signals 列 + 导出层闸门 A 自检。"""
+
+    def test_display_string_is_names_or_unknown(self):
+        assert signal_display({"signals_used": "recency;authority"}) == "recency;authority"
+        assert signal_display({"signals_used": ""}) == UNKNOWN_SIGNAL_LABEL
+        assert signal_display({}) == UNKNOWN_SIGNAL_LABEL
+
+    def test_markdown_shows_unknown_for_a_signal_free_row(self):
+        md = to_markdown(run([rec("全缺")]))
+        assert UNKNOWN_SIGNAL_LABEL in md
+
+    def test_markdown_keeps_the_signal_names_untouched(self):
+        md = to_markdown(run([stale_rec("齐全")]))
+        assert "recency;authority" in md
+        assert UNKNOWN_SIGNAL_LABEL not in md
+
+    def test_missing_recency_count_reads_the_column(self):
+        # 空 signals_used 与 signals_used=relevance 都算缺 recency。
+        res = run([keep_rec("a"), rec("b"), stale_rec("c"), rec("d", bio="简介")])
+        assert missing_recency_count(res) == 2
+
+    def test_no_remove_row_lacks_recency(self):
+        res = run([keep_rec("a"), rec("b"), stale_rec("c"), rec("d", bio="简介")])
+        assert recency_remove_violations(res) == []
+
+    def test_violations_are_reported_when_forced(self):
+        bad = {"class": "remove", "signals_used": "authority",
+               "missing_signals": "recency;relevance"}
+        fine = {"class": "review", "signals_used": "",
+                "missing_signals": "recency;authority;relevance"}
+        assert recency_remove_violations([fine, bad]) == [bad]
+
+    def test_legacy_rows_without_the_column_still_work(self):
+        # 只有日期字段的旧结果字典（Web/UI 可能直接传进来）不能报错。
+        assert recency_missing({"class": "review", "last_seen_days": None,
+                                "last_video_days": None}) is True
+        assert recency_missing({"class": "remove", "last_seen_days": 400.0,
+                                "last_video_days": None}) is False

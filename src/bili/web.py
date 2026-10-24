@@ -25,8 +25,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
-from .export import (CSV_ENCODING, run, signal_warning, to_csv, to_markdown,
-                     to_unfollow_list)
+from .export import (CSV_ENCODING, run, signal_display, signal_warning,
+                     to_csv, to_markdown, to_unfollow_list)
 from .streams import harden_stdio
 from .loaders import SENSITIVE_NAME_RE, load_from_file, refuse_sensitive_path  # noqa: F401
 
@@ -70,8 +70,8 @@ def _display_rows(results: list) -> list:
             "nickname": str(r.get("nickname", "")),
             "class": str(r.get("class", "review")),
             "score": r.get("score", 0),
-            # FOR-36: 每行露出用了几个信号（0-3）。
-            "signals_used": r.get("signals_used", 0),
+            # FOR-36 / ADR r2 §3.4：缺信号显示串与 Markdown 完全相等（全缺时「未知」）。
+            "signals_used": signal_display(r),
             "last_seen_days": r.get("last_seen_days"),
             "last_video_days": r.get("last_video_days"),
             "ratio": ratio,
@@ -218,7 +218,7 @@ PAGE_TAIL = """<section class="remove-panel">
     {key:'nickname', label:'昵称', sort:'str'},
     {key:'class', label:'分类', sort:'str'},
     {key:'score', label:'得分', sort:'num'},
-    {key:'signals_used', label:'信号数', sort:'num'},
+    {key:'signals_used', label:'信号', sort:'str'},
     {key:'last_seen_days', label:'最近活跃(天)', sort:'num'},
     {key:'last_video_days', label:'最新视频(天)', sort:'num'},
     {key:'ratio', label:'粉丝/关注', sort:'str'},

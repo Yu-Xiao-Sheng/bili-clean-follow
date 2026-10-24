@@ -23,7 +23,8 @@ to unfollow.
 - **Companion tool `bili-merge`**: writes a signals.csv template with mid +
   nickname already filled in, so you only type four numbers; fully offline.
 - **Missing data means unknown, not worst-case**: the score is normalized over the signals you actually provided, then two gates apply - no recency signal means never REMOVE (gate A), a bio-only record means never KEEP (gate B). Those rows land in review for you to confirm.
-- **Missing signals are called out**: every row exports `signals_used` (0-3), and when at least half of the rows lack recency the Markdown and web reports show an explicit warning telling you to fill the signals with `bili-merge` first.
+- **Missing signals are called out**: every row exports `signals_used` and `missing_signals` (complementary lists of signal names joined by `;`; the CSV stores the names, the Markdown and web reports render 未知 when nothing is known), and when at least half of the rows lack recency the Markdown and web reports show an explicit warning telling you to fill the signals with `bili-merge` first.
+- **Real exports load as-is**: a `"code":0,"data":{"follower":[…]}` or `data.list` response copied out of the browser is unwrapped automatically, nicknames come from `name` / `uname`, and official certification is read from `official.role/title/department` and `official_verify.type` - no hand-editing of the JSON.
 - **No committed credentials**; works from a user-provided JSON export.
 
 ## Quick start

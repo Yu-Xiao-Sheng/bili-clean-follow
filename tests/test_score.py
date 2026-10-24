@@ -8,7 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from bili.model import Class, FollowRecord
 from bili.loaders import load_from_file, load_from_text
 from bili.score import (GATE_A_REASON, GATE_B_REASON, REVIEW_MIN, classify,
-                        provided_signals, signals_used, weighted_score)
+                        missing_signals, official_evidence, provided_signals,
+                        signals_used, weighted_score)
 
 FIXTURES = Path(__file__).resolve().parent
 
@@ -106,15 +107,29 @@ class TestGateBOnlyBioCannotKeep:
 
 
 class TestSignalsUsedObservability:
+    """ADR r2 §3.4：signals_used / missing_signals 是互补的信号名列表。"""
+
     def test_counts(self):
-        assert signals_used(record("零")) == 0
-        assert signals_used(record("一", bio="简介")) == 1
+        assert signals_used(record("零")) == []
+        assert signals_used(record("一", bio="简介")) == ["relevance"]
         assert signals_used(record("三", bio="简介", last_seen_days=3.0,
-                                   follower_count=10, following_count=20)) == 3
+                                   follower_count=10, following_count=20)) == [
+            "recency", "authority", "relevance"]
+
+    def test_missing_signals_is_the_complement(self):
+        assert missing_signals(record("零")) == [
+            "recency", "authority", "relevance"]
+        assert missing_signals(record("一", bio="简介")) == [
+            "recency", "authority"]
+        full = record("三", bio="简介", last_seen_days=3.0,
+                      follower_count=10, following_count=20)
+        assert missing_signals(full) == []
 
     def test_class_line_reports_signals_used(self):
         _, _, reasons = classify(record("记", bio="简介"))
-        assert "signals_used=1" in reasons[-1]
+        assert "signals_used=relevance" in reasons[-1]
+        _, _, reasons = classify(record("零"))
+        assert "signals_used=none" in reasons[-1]
 
 
 class TestFixturesAreTheAcceptanceProof:
@@ -155,3 +170,34 @@ class TestFixturesAreTheAcceptanceProof:
         recs = load_from_text('{"follower_id": "C", "nickname": "c"}')
         assert len(recs) == 1
         assert recs[0].follower_id == "C"
+
+
+class TestOfficialFieldsDriveRelevance:
+    """FOR-37：官方认证要认 official / official_verify 字段，不能只靠简介里的字。"""
+
+    def test_official_block_counts_as_a_relevance_signal(self):
+        rec = FollowRecord(follower_id="x", nickname="某某", bio="",
+                           extra={"official_title": "知名科技媒体"})
+        assert signals_used(rec) == ["relevance"]
+        assert missing_signals(rec) == ["recency", "authority"]
+
+    def test_certified_row_outranks_an_empty_one(self):
+        plain = FollowRecord(follower_id="1", nickname="无认证", bio="")
+        certified = FollowRecord(follower_id="2", nickname="有认证", bio="",
+                                 extra={"official_title": "认证：媒体"})
+        assert weighted_score(certified) > weighted_score(plain)
+
+    def test_official_evidence_beats_bio_keywords(self):
+        # 换个 bio 也不会掉认证：证据来自字段而不是文案。
+        rec = FollowRecord(follower_id="x", nickname="人民日报", bio="",
+                           extra={"official_role": "认证：媒体"})
+        assert official_evidence(rec) == "认证：媒体"
+        _, _, reasons = classify(rec)
+        assert "official=yes (认证：媒体)" in reasons[2]
+
+    def test_bio_keyword_fallback_is_still_there(self):
+        rec = FollowRecord(follower_id="x", nickname="官方账号",
+                           bio="官方认证的媒体账号，每日更新")
+        assert official_evidence(rec) == ""
+        _, _, reasons = classify(rec)
+        assert "official=yes" in reasons[2]

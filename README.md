@@ -25,7 +25,8 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 - **中文控制台安全**：Windows 中文环境（GBK）下昵称含 emoji 也不会崩，报告照常产出。
 - **补信号伴生工具 `bili-merge`**：生成已预填 mid + 昵称的 signals.csv 模板，你只填 4 个数字，合并后重跑；纯本地，不联网、不调 B站 API。
 - **数据缺失按「未知」处理，不按「最差」处理**：分数只对已提供的信号归一化，再叠两道闸门——缺 recency 的记录不得判 remove（闸门 A），只有简介（哪怕写着「官方认证」）的记录不得判 keep（闸门 B），它们统统落到 review 等你确认。
-- **缺信号会被明确告知**：报告每行带 `signals_used`（本次用了几个信号，0–3）；当本次运行超过一半记录缺 recency 时，Markdown 与 Web 报告顶部打一行警告，提示先用 `bili-merge` 补信号，否则结果不可作为取关依据。
+- **缺信号会被明确告知**：报告每行带 `signals_used` 与 `missing_signals`（已提供 / 未提供的信号名，分号连接，两者互补；CSV 存信号名，Markdown 与 Web 在没有任何信号时显示「未知」）；当本次运行超过一半记录缺 recency 时，Markdown 与 Web 报告顶部打一行警告，提示先用 `bili-merge` 补信号，否则结果不可作为取关依据。
+- **真实导出直接能跑**：浏览器复制的 `{"code":0,"data":{"follower":[…]}}` 或 `data.list` 响应会自动解包，昵称认 `name` / `uname`，官方认证认 `official.role/title/department` 与 `official_verify.type`，不用手改 JSON。
 - **不提交凭据**；基于用户提供的 JSON 导出工作。
 
 ## 快速开始

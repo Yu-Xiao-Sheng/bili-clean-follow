@@ -118,7 +118,8 @@ Since v0.1.2 (FOR-36) a missing signal is *unknown*, not *worst*: the score is a
 average over the signals you actually provided, and two gates sit on top of the thresholds -
 **without a recency signal a row can never be REMOVE**, and **a bio-only row can never be
 KEEP**. Those rows stay in review for you to confirm. Every row of the report and the CSV
-shows `signals_used` (0-3); when at least half of the rows lack recency the report opens
+shows `signals_used` and `missing_signals` (signal names joined by `;`, complementary), and
+the Markdown/web reports render "unknown" as 未知; when at least half of the rows lack recency the report opens
 with a `missing-signal warning` line, because such a run is a ranking, not an unfollow basis.
 
 ## Extending

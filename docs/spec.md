@@ -48,7 +48,11 @@ Each record is scored from three signals (weights sum to 1.0):
 |-------------|--------|-------------------------------------------------------------|
 | recency     | 0.45   | last_seen_days preferred, else last_video_days. 0d->1.0, 365d->0.1 decay |
 | authority   | 0.30   | log10(follower/following + 1) / 3, clamped to 0..1        |
-| relevance   | 0.25   | bio length quality (>=12 chars full) + official/verified marker bonus |
+| relevance   | 0.25   | bio length quality (>=12 chars full) + official certification (`official.role/title/department`, `official_verify.type > 0`), with a bio-keyword fallback |
+
+Official certification is read from fields, not from bio wording (FOR-37): `official.*`,
+flat `official_*` keys and `official_verify.type > 0` are captured into `extra.official_*`;
+`type` 0 / -1 means "not certified". Bio keywords are only a fallback.
 
 A signal is only counted if the record actually provides it, and the score is the
 weighted average over the provided signals: `score = sum(w_k*p_k) / sum(w_k)`,
@@ -68,9 +72,17 @@ Hard gates on top of the thresholds (FOR-36):
 - **Gate B (keep direction)** - KEEP requires recency or authority; a bio-only
   record (even one that says "official verified") is downgraded to review.
 
-Every exported row also carries `signals_used` (0-3), and when at least 50% of the
-rows lack recency the Markdown and web reports start with a `missing-signal warning`
-line telling the user to fill the signals with bili-merge first.
+Every exported row also carries `signals_used` and `missing_signals`: complementary
+lists of signal names joined by `;` in fixed order (`recency;authority;relevance`),
+empty string when nothing is known. The CSV data layer stores the names untranslated;
+the Markdown and web reports share one display string that shows `未知` when no signal
+is available. No integer count is stored anywhere - count the list elements if needed.
+
+Export-layer invariant: a row whose `missing_signals` contains `recency` can never be
+`remove` (`bili.export.recency_remove_violations()` returns [] on every fixture).
+
+When at least 50% of the rows lack recency the Markdown and web reports start with a
+`missing-signal warning` line telling the user to fill the signals with bili-merge first.
 
 ## Output
 - **Markdown report** (--md FILE or stdout): a table per class (KEEP/REVIEW/REMOVE)

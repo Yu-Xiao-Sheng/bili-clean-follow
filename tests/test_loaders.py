@@ -162,3 +162,46 @@ class TestRealResponseEnvelope:
         recs = load_from_text(json.dumps([{"mid": "3", "uname": "\u963f\u82b1", "sign": "\u6444\u5f71"}]))
         assert recs[0].nickname == "\u963f\u82b1"
         assert recs[0].bio == "\u6444\u5f71"
+
+
+class TestRealExportFixtures:
+    """FOR-37：真实形状夹具文件进 tests（浏览器复制的响应，带 official 块与 emoji 昵称）。"""
+
+    REAL = Path(__file__).resolve().parent / "fixture-bili-real.json"
+    REAL_LIST = Path(__file__).resolve().parent / "fixture-bili-real-list.json"
+
+    def test_data_follower_envelope_file_loads(self):
+        recs = load_from_file(str(self.REAL))
+        assert len(recs) == 20
+        assert all(r.nickname for r in recs), "真实导出昵称不能空"
+        assert recs[0].mid == 22000
+
+    def test_data_list_variant_loads(self):
+        recs = load_from_file(str(self.REAL_LIST))
+        assert len(recs) == 20
+        assert all(r.nickname for r in recs)
+
+    def test_name_is_the_nickname_field_and_sign_is_the_bio(self):
+        recs = load_from_file(str(self.REAL))
+        row = [r for r in recs if r.mid == 22000][0]
+        assert row.nickname == "人民日报"
+        assert row.bio == "官方认证的媒体账号，每日更新"
+
+    def test_official_block_reaches_the_record(self):
+        recs = load_from_file(str(self.REAL))
+        certified = [r for r in recs if r.extra.get("official_title")]
+        assert [r.mid for r in certified] == [22000, 22001, 22017]
+        assert certified[0].extra["official_role"] == "认证：媒体"
+        # official_verify.type = 0 的那些账号不算认证。
+        assert len(certified) == 3
+
+    def test_emoji_nickname_survives_the_round_trip(self):
+        recs = load_from_file(str(self.REAL))
+        names = [r.nickname for r in recs]
+        assert any(n.startswith(chr(0x1F600)) for n in names)
+
+    def test_hoisted_array_variant_loads(self):
+        # 有的用户把 data.follower 手工提到顶层（docs/getting-started.md 方式 B）。
+        payload = json.loads(self.REAL.read_text(encoding="utf-8"))
+        rows = payload["data"]["follower"]
+        assert len(load_from_text(json.dumps(rows, ensure_ascii=False))) == 20

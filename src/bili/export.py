@@ -5,7 +5,7 @@ import io
 from typing import List
 
 from .model import FollowRecord
-from .score import classify, signals_used
+from .score import classify, missing_signals, signals_used
 
 # CSV 一律带 BOM（FOR-38）：Windows 记事本/Excel/WPS 双击打开没有 BOM 的 UTF-8
 # 会按 GBK 猜，中文昵称全部乱码。Markdown 不需要 BOM，保持 utf-8。
@@ -27,6 +27,10 @@ UNFOLLOW_NOTICE = (
 # 取关依据 - 必须在 md / Web 报告顶部显式说出来，别让用户拿着它去取关。
 MISSING_RECENCY_WARN_RATIO = 0.5
 
+# 显示层：MD 与 Web 在中文下把「一个信号都没有」统一显示成「未知」（ADR r2 §3.4）。
+# CSV 数据层不翻译：signals_used 存信号名（全缺时是空串），missing_signals 存补集。
+UNKNOWN_SIGNAL_LABEL = "未知"
+
 SIGNAL_FILL_HINT = (
     "先补 last_seen_days / last_video_days / follower_count / following_count"
     "（bili-merge 会生成已预填 mid + 昵称的待填模板），否则结果不可作为取关依据。"
@@ -35,13 +39,47 @@ SIGNAL_FILL_HINT = (
 )
 
 
+def _signal_names(row: dict, key: str) -> List[str]:
+    """Split a semicolon-joined signal-name cell back into a list."""
+    return [x for x in str(row.get(key, "") or "").split(";") if x]
+
+
+def signal_display(row: dict) -> str:
+    """缺信号显示串（MD 与 Web 共用同一份，ADR r2 §3.4：两处必须完全相等）。
+
+    CSV 数据层不用它 - CSV 存 signals_used / missing_signals 两个原始字段。
+    """
+    used = _signal_names(row, "signals_used")
+    return ";".join(used) if used else UNKNOWN_SIGNAL_LABEL
+
+
 def recency_missing(result: dict) -> bool:
     """True when a result row carries no recency signal at all."""
-    return result.get("last_seen_days") is None and result.get("last_video_days") is None
+    missing = _signal_names(result, "missing_signals")
+    if missing:
+        return "recency" in missing
+    used = _signal_names(result, "signals_used")
+    if used:
+        return "recency" not in used
+    return (result.get("last_seen_days") is None
+            and result.get("last_video_days") is None)
 
 
 def missing_recency_count(results: List[dict]) -> int:
     return sum(1 for r in results if recency_missing(r))
+
+
+def recency_remove_violations(results: List[dict]) -> List[dict]:
+    """导出层不变量（ADR r2 §4）：缺 recency 的行不得是 remove。
+
+    闸门 A 已在 score 层实现，这里把同一条规则抬到导出层做自检，
+    FOR-41 的端到端套件直接断言这个函数返回空列表。
+    """
+    bad = []
+    for r in results:
+        if r.get("class") == "remove" and recency_missing(r):
+            bad.append(r)
+    return bad
 
 
 def signal_warning(results: List[dict]) -> str:
@@ -61,6 +99,10 @@ def run(records: List[FollowRecord]) -> List[dict]:
     out = []
     for rec in records:
         cls, score, reasons = classify(rec)
+        # FOR-36 / ADR r2 §3.4：两个互补的信号名列表（顺序固定 recency;authority;relevance），
+        # 数据层不落整数，计数由消费方数列表元素。
+        used = signals_used(rec)
+        missing = missing_signals(rec)
         out.append({
             "follower_id": rec.follower_id,
             "mid": rec.mid if rec.mid is not None else rec.follower_id,
@@ -73,8 +115,8 @@ def run(records: List[FollowRecord]) -> List[dict]:
             "last_video_days": rec.last_video_days,
             "follower_count": rec.follower_count,
             "following_count": rec.following_count,
-            # FOR-36: 每行都露出"这次到底用了几个信号"，用户才知道结果可不可信。
-            "signals_used": signals_used(rec),
+            "signals_used": ";".join(used),
+            "missing_signals": ";".join(missing),
         })
     return out
 
@@ -96,8 +138,8 @@ def to_markdown(results: List[dict]) -> str:
         lines.append("| # | Name | Score | Signals | Last seen (d) | Last video (d) | Reason |")
         lines.append("|---|:---|---:|---:|---:|---:|:---|")
         for i, r in enumerate(group, 1):
-            lines.append("| %d | %s | %.2f | %d | %s | %s | %s |" % (
-                i, r["nickname"], r["score"], int(r.get("signals_used") or 0),
+            lines.append("| %d | %s | %.2f | %s | %s | %s | %s |" % (
+                i, r["nickname"], r["score"], signal_display(r),
                 _fmt(r["last_seen_days"]), _fmt(r["last_video_days"]),
                 _clean_pipe(str(r["reason"][:120]))))
         lines.append("")
@@ -107,7 +149,7 @@ def to_markdown(results: List[dict]) -> str:
 def to_csv(results: List[dict]) -> str:
     fields = ["follower_id", "nickname", "class", "score",
               "last_seen_days", "last_video_days", "follower_count", "following_count",
-              "signals_used"]
+              "signals_used", "missing_signals"]
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
     w.writeheader()

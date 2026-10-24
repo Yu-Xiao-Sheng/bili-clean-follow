@@ -11,6 +11,7 @@ import pytest
 
 from bili import demo
 from bili import web
+from bili.export import UNKNOWN_SIGNAL_LABEL, to_markdown
 from bili.export import run as export_run
 
 
@@ -221,12 +222,22 @@ class TestSignalsUsedColumnInWeb:
         try:
             status, _, body = _get(_base(srv), "/api/results")
             rows = json.loads(body.decode("utf-8"))["rows"]
-            assert rows and all(r["signals_used"] == 3 for r in rows)
+            # ADR r2 §3.4：Web 与 Markdown 共用同一份显示串（信号名列表）。
+            assert rows and all(
+                r["signals_used"] == "recency;authority;relevance" for r in rows)
         finally:
             srv.shutdown()
             srv.server_close()
 
-    def test_minimal_export_rows_show_zero_or_one_signal(self):
+    def test_minimal_export_rows_show_unknown_or_relevance(self):
         rows = web._display_rows(web.load_report(str(MINIMAL_FIXTURE)))
         assert rows
-        assert all(r["signals_used"] <= 1 for r in rows)
+        assert set(r["signals_used"] for r in rows) <= {
+            UNKNOWN_SIGNAL_LABEL, "relevance"}
+
+    def test_web_and_markdown_share_one_display_string(self):
+        # ADR r2 §3.4：同一条记录在 MD 与 Web 的缺信号显示串必须完全相等。
+        results = web.load_report(str(MINIMAL_FIXTURE))
+        md = to_markdown(results)
+        for row in web._display_rows(results):
+            assert row["signals_used"] in md

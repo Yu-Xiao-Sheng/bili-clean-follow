@@ -234,9 +234,12 @@ class TestMissingSignalsAreNotEvidence:
         out = run_cli(str(MINIMAL_FIXTURE), "--csv", str(csv_path))
         assert out.returncode == 0, out.stderr
         lines = csv_path.read_bytes().decode("utf-8-sig").strip().splitlines()
-        assert lines[0].split(",")[-1] == "signals_used"
-        used = {row.split(",")[-1] for row in lines[1:]}
-        assert used <= {"0", "1"}, used
+        header = lines[0].split(",")
+        assert "signals_used" in header and "missing_signals" in header
+        # ADR r2 §3.4：数据层存信号名，不存 0-3 整数。
+        col = header.index("signals_used")
+        used = {row.split(",")[col] for row in lines[1:]}
+        assert used <= {"", "relevance"}, used
 
     def test_full_signal_fixture_still_produces_removes(self, tmp_path):
         unfollow = tmp_path / "u.txt"

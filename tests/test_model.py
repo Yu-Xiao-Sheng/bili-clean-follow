@@ -91,3 +91,60 @@ class TestClass:
         # str-enum: comparisons with plain literals hold
         assert Class.KEEP == "keep"
         assert "keep" in (Class.KEEP,)
+
+
+class TestOfficialCertification:
+    """FOR-37：official / official_verify 识别结果落到 extra.official_*。"""
+
+    def test_official_block_is_captured(self):
+        r = FollowRecord.from_dict({
+            "mid": "22000", "name": "人民日报", "sign": "官方认证的媒体账号",
+            "official": {"role": "认证：媒体", "title": "知名科技媒体", "department": ""},
+            "official_verify": {"type": 1},
+        })
+        assert r.nickname == "人民日报"
+        assert r.extra["official_title"] == "知名科技媒体"
+        assert r.extra["official_role"] == "认证：媒体"
+        assert r.extra["official_verified"] is True
+        # department 是空串 -> 不落键，extra 里不留空值。
+        assert "official_department" not in r.extra
+
+    def test_flat_official_fields_work_too(self):
+        r = FollowRecord.from_dict({"mid": "1", "nickname": "n",
+                                    "official_title": "知名科技媒体",
+                                    "official_verify": {"type": -1}})
+        assert r.extra["official_title"] == "知名科技媒体"
+        assert r.extra["official_verified"] is True
+
+    def test_verify_type_zero_or_minus_one_is_not_certification(self):
+        # 导出里 official_verify.type = 0 / -1 是「没有认证」的占位，不能当证据。
+        r = FollowRecord.from_dict({"mid": "1", "name": "老番茄",
+                                    "official_verify": {"type": 0}})
+        assert r.extra == {}
+        r2 = FollowRecord.from_dict({"mid": "2", "name": "x",
+                                     "official_verify": {"type": -1}})
+        assert r2.extra == {}
+
+    def test_verify_source_is_a_title_fallback(self):
+        r = FollowRecord.from_dict({"mid": "1", "nickname": "n",
+                                    "official_verify": {"type": 1, "source": "某机构"}})
+        assert r.extra["official_title"] == "某机构"
+
+    def test_non_int_verify_type_does_not_crash(self):
+        r = FollowRecord.from_dict({"mid": "1", "nickname": "n",
+                                    "official_verify": {"type": "unknown"}})
+        assert r.extra == {}
+
+    def test_existing_extra_keys_survive(self):
+        r = FollowRecord.from_dict({"mid": "1", "nickname": "n",
+                                    "extra": {"tag": "a"},
+                                    "official": {"title": "T"}})
+        assert r.extra["tag"] == "a"
+        assert r.extra["official_title"] == "T"
+
+    def test_extra_is_not_shared_between_records(self):
+        a = FollowRecord.from_dict({"mid": "1", "nickname": "a",
+                                    "official": {"title": "T"}})
+        b = FollowRecord.from_dict({"mid": "2", "nickname": "b"})
+        assert "official_title" not in b.extra
+        assert a.extra is not b.extra

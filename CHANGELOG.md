@@ -6,8 +6,14 @@ Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 
 ## [Unreleased]
 
+### Changed
+- **打分口径：信号缺失按「未知」处理，不再按「最差」处理（FOR-36，v0.1.1 的行为是 bug）**：v0.1.1 把未提供的信号置为 0、权重和固定 1.0，「不知道」在数学上等于「最坏」，真实导出（只有 identity + bio）会一边倒跑成 `keep=0 review=0 remove=13`。现在只对已提供信号求加权平均（`score = Σ(w_k·p_k) / Σ(w_k)`，分母只含已提供信号的权重），并加两道硬闸门：闸门 A 缺 `recency` 不得判 remove（原因行 `downgraded to review: no recency signal`），闸门 B 只有简介不得判 keep。REVIEW_MIN / KEEP_MIN 保持 0.40 / 0.70 不变；仓库自带样例与 demo 的可复现输出不变（24 条样例每条都给满三个信号）
+- 报告与 CSV 的可观测性字段定型（FOR-36）：CSV 新增 `signals_used` 与 `missing_signals` 两列，存分号连接的信号名（`recency;authority`，顺序固定，两者互补，全缺时为空串），数据层不存 0–3 整数；Markdown 与 Web 报告共用同一份显示串，一个信号都没有时显示「未知」，CSV 不翻译。取关清单与报告同一条记录三处显示完全相等
+- 本次运行 ≥50% 记录缺 recency 时，Markdown / Web 报告顶部与 CLI stderr 打一行显式警告：先补 last_seen_days / last_video_days / follower_count / following_count（bili-merge 会生成待填模板），否则结果不可作为取关依据（FOR-36）
+
 ### Fixed
-- Windows 中文控制台 P0（FOR-38）：昵称含 emoji 时 CLI / Web / demo 不再 UnicodeEncodeError 崩栈——入口统一 `bili.streams.harden_stdio()`，写 stdout 再兜一层，报告不会整份丢失
+- 真实导出识别（FOR-37）：`{"code":0,"data":{"follower":[…]}}` 与 `data.list` 信封会自动解包，浏览器里直接复制的关注列表响应不用再手工提到顶层；昵称认 `name` / `uname`，取关清单不再是一串空名字；官方认证改认 `official.role/title/department` 与 `official_verify.type > 0`（落到 `extra.official_*` 并进 relevance），不再只靠简介里有没有「官方」两个字——换个 bio 就不会掉认证。`official_verify.type` 为 0 / -1 视为无认证占位，不算认证证据
+- Windows 中文控制台 P0（FOR-38）- Windows 中文控制台 P0（FOR-38）：昵称含 emoji 时 CLI / Web / demo 不再 UnicodeEncodeError 崩栈——入口统一 `bili.streams.harden_stdio()`，写 stdout 再兜一层，报告不会整份丢失
 - CSV 与取关清单统一 utf-8-sig（带 BOM），Windows Excel / WPS / 记事本双击打开中文不再乱码；Markdown 仍为不带 BOM 的 utf-8（FOR-38）
 - 取关候选清单从「只有 mid 数字」改为 `mid <TAB> 昵称` + 说明抬头，CLI 与 Web `/unfollow` 共用同一份，并写明只用于人工核对、工具不会自动取关（FOR-38）
 - 凭据拦截改为内容优先：内容里真的出现 SESSDATA / bili_jct 等 cookie 键才拒绝并点名键名；只是文件名带 cookie 的正常导出改为放行 + 提示改名，拒绝信息附带改名建议（FOR-38）

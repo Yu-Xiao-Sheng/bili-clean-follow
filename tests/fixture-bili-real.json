@@ -1,0 +1,305 @@
+{
+  "code": 0,
+  "message": "0",
+  "ttl": 1,
+  "data": {
+    "total": 20,
+    "follower": [
+      {
+        "mid": 22000,
+        "name": "人民日报",
+        "sign": "官方认证的媒体账号，每日更新",
+        "face": "//static.hdslb.com/images/member/fans-medal-0.png",
+        "official_verify": {
+          "type": 1
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0,
+        "official": {
+          "role": "认证：媒体",
+          "title": "知名科技媒体",
+          "department": ""
+        }
+      },
+      {
+        "mid": 22001,
+        "name": "央视新闻",
+        "sign": "中央广播电视总台新闻频道官方账号",
+        "face": "//static.hdslb.com/images/member/fans-medal-1.png",
+        "official_verify": {
+          "type": 1
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0,
+        "official": {
+          "role": "认证：媒体",
+          "title": "知名科技媒体",
+          "department": ""
+        }
+      },
+      {
+        "mid": 22002,
+        "name": "老番茄",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-2.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22003,
+        "name": "何同学",
+        "sign": "个人UP主，记录生活",
+        "face": "//static.hdslb.com/images/member/fans-medal-3.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22004,
+        "name": "影视飓风",
+        "sign": "认证：知名科技媒体",
+        "face": "//static.hdslb.com/images/member/fans-medal-4.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22005,
+        "name": "罗翔说刑法",
+        "sign": "中国政法大学教授",
+        "face": "//static.hdslb.com/images/member/fans-medal-5.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22006,
+        "name": "毕导",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-6.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22007,
+        "name": "小约翰可汗",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-7.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22008,
+        "name": "手工耿",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-8.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22009,
+        "name": "绵羊料理",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-9.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22010,
+        "name": "老师好我叫何同学2",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-10.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22011,
+        "name": "技术蛋老师",
+        "sign": "硬核科技测评",
+        "face": "//static.hdslb.com/images/member/fans-medal-11.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22012,
+        "name": "XFUN机械表",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-12.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22013,
+        "name": "阿Test本体",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-13.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22014,
+        "name": "严伯钧",
+        "sign": "科普作者",
+        "face": "//static.hdslb.com/images/member/fans-medal-14.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22015,
+        "name": "柴知道",
+        "sign": "科普视频作者",
+        "face": "//static.hdslb.com/images/member/fans-medal-15.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22016,
+        "name": "生物老师李颖",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-16.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22017,
+        "name": "AI科技评论",
+        "sign": "科技媒体官方账号",
+        "face": "//static.hdslb.com/images/member/fans-medal-17.png",
+        "official_verify": {
+          "type": 1
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0,
+        "official": {
+          "role": "认证：媒体",
+          "title": "知名科技媒体",
+          "department": ""
+        }
+      },
+      {
+        "mid": 22018,
+        "name": "日常小确幸",
+        "sign": "分享日常",
+        "face": "//static.hdslb.com/images/member/fans-medal-18.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      },
+      {
+        "mid": 22019,
+        "name": "😀_某个带 emoji 的昵称",
+        "sign": "",
+        "face": "//static.hdslb.com/images/member/fans-medal-19.png",
+        "official_verify": {
+          "type": 0
+        },
+        "official_role": "",
+        "official_title": "",
+        "official_department": "",
+        "tag_followed": false,
+        "attr": 0
+      }
+    ]
+  }
+}

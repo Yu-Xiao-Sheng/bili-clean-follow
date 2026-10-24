@@ -10,9 +10,11 @@ bili-clean-follow 为每个关注给出 0–1 的分数，并附人类可读的�
 |------|------|------|------|
 | recency | 0.45 | 最近多久看到 / 对方最近多久发布 | `last_seen_days` / `last_video_days` |
 | authority | 0.30 | 粉丝/关注比（圈层质量代理） | `follower_count` + `following_count` |
-| relevance | 0.25 | 简介质量 + 官方/认证标记 | `bio` / `sign` |
+| relevance | 0.25 | 简介质量 + 官方认证 | `bio` / `sign` + `official.*` / `official_verify` |
 
-一个信号是否「已提供」取决于字段是否存在：recency 要求两个日期至少一个非空，authority 要求粉丝数与关注数**都**非空，relevance 要求简介非空。
+一个信号是否「已提供」取决于字段是否存在：recency 要求两个日期至少一个非空，authority 要求粉丝数与关注数**都**非空，relevance 要求简介非空**或**带官方认证块。
+
+官方认证（FOR-37）优先认字段而不是文案：`official.role/title/department`、平铺的 `official_*` 字段，以及 `official_verify.type > 0`，都会被读进 `extra.official_*`；只有拿不到认证块时才退回简介关键词（官方 / 认证 / verified / official / 媒体 / 传媒 / 工作室）。`official_verify.type` 是 0 或 -1 时按「没有认证」处理。
 
 ## 计算（Computation）
 
@@ -49,9 +51,11 @@ P 为空时 score = 0.0
 
 闸门不是调阈值：REVIEW_MIN / KEEP_MIN 保持 0.40 / 0.70 不变，也不允许靠改这两个常量把缺失糊过去。
 
+导出层还有一条自检不变量（ADR r2 §4）：任一行 `missing_signals` 含 `recency` ⇒ 该行 `class` 不得是 `remove`，由 `bili.export.recency_remove_violations()` 计算，测试直接断言它返回空列表。
+
 ## 可观测性（Observability）
 
-- 每行结果带 `signals_used`（已提供信号数 0–3），CSV、Markdown 表格、Web 报告都能看到。
+- 每行结果带 `signals_used` 与 `missing_signals` 两列（ADR r2 §3.4 唯一形态）：值域固定 `recency|authority|relevance`，分号连接、顺序固定，两者互补且互不相交；全缺时 `signals_used` 是空串。CSV 数据层存信号名（不翻译），Markdown 与 Web 显示层共用同一份显示串，一个信号都没有时显示「未知」。需要计数就数列表元素，数据层不存 0–3 整数。
 - 当本次运行 **≥50%** 的记录缺 recency 时，Markdown 与 Web 报告顶部打一行警告：
   `missing-signal warning: N/M (…%) 的记录没有 recency 信号。先补 last_seen_days / last_video_days /
   follower_count / following_count（bili-merge 会生成待填模板），否则结果不可作为取关依据。`
@@ -63,7 +67,7 @@ P 为空时 score = 0.0
 
 ```
 recency: seen 2 days ago · authority: 180000 followers vs 60 following
-· relevance: 7-char bio (official=yes) · class=keep score=0.94 signals_used=3
+· relevance: 7-char bio (official=yes) · class=keep score=0.94 signals_used=recency;authority;relevance
 ```
 
 触发闸门时多一行说明：
@@ -71,5 +75,5 @@ recency: seen 2 days ago · authority: 180000 followers vs 60 following
 ```
 recency: unknown · authority: unknown · relevance: 14-char bio (official=yes)
 · downgraded to review: keep needs recency or authority
-· class=review score=1.00 signals_used=1
+· class=review score=1.00 signals_used=relevance
 ```
