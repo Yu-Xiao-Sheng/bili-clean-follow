@@ -15,8 +15,10 @@ and/or CSV report.
    export** that captures identity + optional signals. (See Getting Started for
    how to produce the input, including an optional browser-export approach.)
 3. **Explainable.** Every record gets a numeric score and a reason string.
-4. **Neutral on missing data.** A record with no available signals is never
-   auto-kept; it falls to review/remove conservatively.
+4. **Unknown is not worst-case** (since v0.1.2, FOR-36). Missing signals drop out of
+   the score denominator instead of scoring 0, and two hard gates apply: a record
+   without a recency signal is never REMOVE, and a record without recency *or*
+   authority is never KEEP. Both fall to review, where a human confirms.
 
 ## Input data model
 A JSON list of follow objects. Recognized fields:
@@ -33,8 +35,11 @@ A JSON list of follow objects. Recognized fields:
 | following_count  | number   | no       | This follow's following count             |
 | extra            | object   | no       | Arbitrary extra fields (ignored in scoring) |
 
-The loader accepts a bare list, or wrappers shaped like
-{"follower": [...]} / {"data": [...]} / {"list": [...]}.
+The loader accepts a bare list, a single object, or wrappers shaped like
+{"follower": [...]} / {"data": [...]} / {"list": [...]}, including the nested
+{"code":0,"data":{"follower":[...]}} envelope you get by copying the browser
+response verbatim (FOR-36). In that response the display name lives under
+`uname`, which is mapped to nickname (nickname / follower_name / uname / name).
 
 ## Scoring model
 Each record is scored from three signals (weights sum to 1.0):
@@ -45,13 +50,27 @@ Each record is scored from three signals (weights sum to 1.0):
 | authority   | 0.30   | log10(follower/following + 1) / 3, clamped to 0..1        |
 | relevance   | 0.25   | bio length quality (>=12 chars full) + official/verified marker bonus |
 
-A signal is only counted (and its weight applied) if the record actually
-provides it. The final score is clamped to 0..1.
+A signal is only counted if the record actually provides it, and the score is the
+weighted average over the provided signals: `score = sum(w_k*p_k) / sum(w_k)`,
+where the denominator contains only the weights of provided signals
+(0.0 when nothing is provided). The final score is clamped to 0..1.
 
 Classification thresholds:
 - score >= 0.70  -> **keep**
 - score >= 0.40  -> **review**
 - otherwise      -> **remove**
+
+Hard gates on top of the thresholds (FOR-36):
+
+- **Gate A (unfollow direction)** - no recency signal -> the record can never be
+  REMOVE; it is downgraded to review with the reason line
+  `downgraded to review: no recency signal`.
+- **Gate B (keep direction)** - KEEP requires recency or authority; a bio-only
+  record (even one that says "official verified") is downgraded to review.
+
+Every exported row also carries `signals_used` (0-3), and when at least 50% of the
+rows lack recency the Markdown and web reports start with a `missing-signal warning`
+line telling the user to fill the signals with bili-merge first.
 
 ## Output
 - **Markdown report** (--md FILE or stdout): a table per class (KEEP/REVIEW/REMOVE)

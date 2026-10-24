@@ -1,0 +1,60 @@
+{
+  "data": {
+    "follower": [
+      {
+        "mid": "400001",
+        "nickname": "晚舟",
+        "sign": "官方认证工作室",
+        "last_seen_days": 2.0,
+        "last_video_days": 3.0,
+        "follower_count": 180000,
+        "following_count": 60
+      },
+      {
+        "mid": "400002",
+        "nickname": "南野",
+        "sign": "摄影教学",
+        "last_seen_days": 40.0,
+        "last_video_days": 55.0,
+        "follower_count": 26000,
+        "following_count": 300
+      },
+      {
+        "mid": "400003",
+        "nickname": "拾光",
+        "sign": "",
+        "last_seen_days": 520.0,
+        "last_video_days": 640.0,
+        "follower_count": 80,
+        "following_count": 15000
+      },
+      {
+        "mid": "400004",
+        "nickname": "青灯",
+        "sign": "已停更",
+        "last_seen_days": 900.0,
+        "last_video_days": 1100.0,
+        "follower_count": 12,
+        "following_count": 200
+      },
+      {
+        "mid": "400005",
+        "nickname": "云归",
+        "sign": "日常",
+        "last_seen_days": 700.0,
+        "last_video_days": 800.0,
+        "follower_count": 5,
+        "following_count": 900
+      },
+      {
+        "mid": "400006",
+        "nickname": "木子",
+        "sign": "影评",
+        "last_seen_days": 430.0,
+        "last_video_days": 520.0,
+        "follower_count": 900,
+        "following_count": 25000
+      }
+    ]
+  }
+}

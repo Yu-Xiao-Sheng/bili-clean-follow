@@ -1,21 +1,45 @@
-"""Score each follow into keep / review / remove with a human-readable reason."""
+"""Score each follow into keep / review / remove with a human-readable reason.
 
-from typing import List, Tuple
+FOR-36 口径（CTO ADR：缺失信号按"未知"处理，绝不按"最差"处理）：
+
+1. **归一化**：只对已提供的信号求加权平均，
+   ``score = sum(w_k * p_k) / sum(w_k)``，分母只含已提供信号的权重。
+   一个信号都没有时 score = 0.0。未知不等于最差。
+2. **闸门 A（取关方向）**：recency 未知 -> 不得判 remove，最多 review，
+   并追加原因行 ``downgraded to review: no recency signal``。
+3. **闸门 B（保留方向）**：keep 至少要提供 recency 或 authority 之一；
+   只有 relevance（简介）时不得 keep，最多 review。
+4. **可观测性**：``signals_used``（已提供信号数 0-3）随结果一起导出到
+   CSV / Markdown / Web 报告。
+
+ADR 明确禁止的绕法：不许靠调低 REVIEW_MIN / KEEP_MIN 把信号缺失糊过去。
+"""
+
+from typing import Dict, List, Tuple
 
 from .model import Class, FollowRecord
 
-# Tunable weights. Weights are per-signal; missing signals are simply skipped
-# (contribute 0), so a follow with fewer known signals tends toward review/remove.
+# Tunable weights. Weights are per-signal; only the *provided* signals take part
+# in the average (FOR-36): the denominator is the weight sum of provided signals,
+# so a missing signal is unknown, not a zero score.
 WEIGHTS = {
     "recency": 0.45,     # how recently you saw them / they posted
     "authority": 0.30,   # follower/following ratio -> niche/quality proxy
     "relevance": 0.25,   # bio signals (official/verified keywords, length)
 }
 
+# Fixed signal order (used for signals_used reporting and stable reason lines).
+SIGNALS = ("recency", "authority", "relevance")
+
 REVIEW_MIN = 0.40
 KEEP_MIN = 0.70
 
 OFFICIAL_BIOS = ("官方", "认证", "verified", "official", "媒体", "传媒", "工作室")
+
+# 闸门 A 的固定原因行（CTO 验收按这个字符串找）。
+GATE_A_REASON = "downgraded to review: no recency signal"
+# 闸门 B 的原因行。
+GATE_B_REASON = "downgraded to review: keep needs recency or authority"
 
 
 def _clamp01(x: float) -> float:
@@ -62,23 +86,51 @@ def _provided(record: FollowRecord, name: str) -> bool:
     return False
 
 
-def classify(record: FollowRecord) -> Tuple[Class, float, List[str]]:
-    """Return (class, score, [reasons]). Unknown signals are skipped (neutral)."""
-    parts = {}
-    for k in WEIGHTS:
-        if _provided(record, k):
-            if k == "recency":
-                d = record.last_seen_days if record.last_seen_days is not None else record.last_video_days
-                parts[k] = _recency_signal(d)
-            elif k == "authority":
-                parts[k] = _authority_signal(record)
-            elif k == "relevance":
-                parts[k] = _relevance_signal(record)
-        else:
-            parts[k] = 0.0
+def provided_signals(record: FollowRecord) -> List[str]:
+    """The signal names this record actually carries (stable order)."""
+    return [name for name in SIGNALS if _provided(record, name)]
 
-    score = sum(WEIGHTS[k] * parts[k] for k in WEIGHTS)
-    score = _clamp01(score)
+
+def signals_used(record: FollowRecord) -> int:
+    """How many of the three signals are known (0-3) - exported per row (FOR-36)."""
+    return len(provided_signals(record))
+
+
+def signal_scores(record: FollowRecord) -> Dict[str, float]:
+    """Sub-scores for the *provided* signals only; missing signals are absent."""
+    out: Dict[str, float] = {}
+    for name in SIGNALS:
+        if not _provided(record, name):
+            continue
+        if name == "recency":
+            days = (record.last_seen_days if record.last_seen_days is not None
+                    else record.last_video_days)
+            out[name] = _recency_signal(days)
+        elif name == "authority":
+            out[name] = _authority_signal(record)
+        else:
+            out[name] = _relevance_signal(record)
+    return out
+
+
+def weighted_score(record: FollowRecord) -> float:
+    """Normalized weighted average over provided signals (0.0 when none known)."""
+    parts = signal_scores(record)
+    denom = sum(WEIGHTS[k] for k in parts)
+    if not denom:
+        return 0.0
+    return _clamp01(sum(WEIGHTS[k] * parts[k] for k in parts) / denom)
+
+
+def classify(record: FollowRecord) -> Tuple[Class, float, List[str]]:
+    """Return (class, score, [reasons]).
+
+    Unknown signals are skipped, not penalized: they drop out of the denominator
+    (FOR-36 rule 1) and the two gates below keep them from producing an
+    unfollow recommendation or an unearned keep.
+    """
+    parts = signal_scores(record)
+    score = weighted_score(record)
 
     if score >= KEEP_MIN:
         cls = Class.KEEP
@@ -87,7 +139,17 @@ def classify(record: FollowRecord) -> Tuple[Class, float, List[str]]:
     else:
         cls = Class.REMOVE
 
-    reasons = []
+    notes: List[str] = []
+    # 闸门 A：没有 recency 就没有取关依据（未知不是证据）。
+    if "recency" not in parts and cls == Class.REMOVE:
+        cls = Class.REVIEW
+        notes.append(GATE_A_REASON)
+    # 闸门 B：只有简介（relevance）不足以支撑 keep。
+    if cls == Class.KEEP and not ("recency" in parts or "authority" in parts):
+        cls = Class.REVIEW
+        notes.append(GATE_B_REASON)
+
+    reasons: List[str] = []
     if record.last_seen_days is not None:
         reasons.append("recency: seen %.0f days ago" % record.last_seen_days)
     elif record.last_video_days is not None:
@@ -104,7 +166,7 @@ def classify(record: FollowRecord) -> Tuple[Class, float, List[str]]:
             len(record.bio.strip()), "yes" if _relevance_signal(record) > 0.6 else "no"))
     else:
         reasons.append("relevance: empty bio")
-
-    top = " - ".join(r for r in reasons[:3])
-    reasons.append("class=%s score=%.2f for %s" % (cls.value, score, record.nickname))
+    reasons.extend(notes)
+    reasons.append("class=%s score=%.2f signals_used=%d for %s" % (
+        cls.value, score, len(parts), record.nickname))
     return cls, score, reasons

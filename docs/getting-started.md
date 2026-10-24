@@ -43,8 +43,11 @@ privacy-safe way to get one:
 2. Open DevTools -> Network and find the request that returns the follow list
    (the page calls an endpoint that returns a follower array).
 3. Copy the response body into follows.json.
-   - If the body looks like {"data": {"follower": [...]}}, the loader unwraps the
-     follower / data / list keys automatically.
+   - If the body looks like {"code":0,"data":{"follower":[...]}}, the loader unwraps
+     the follower / data / list keys automatically - including the nested
+     data.follower envelope you get by copying the browser response verbatim.
+   - In that response the display name is `uname`; the loader maps it to nickname, so
+     the unfollow list still carries names (FOR-36).
    - Optionally enrich each object with last_seen_days / last_video_days /
      follower_count / following_count to get a better score. The raw endpoint only
      gives identity + bio + avatar; the richer signals come from the per-profile
@@ -110,6 +113,13 @@ WPS on Windows opens it without mojibake.
 See [docs/scoring-model.md](scoring-model.md) and [docs/spec.md](spec.md) for the weights,
 signals and thresholds. Tweak WEIGHTS, REVIEW_MIN and KEEP_MIN in src/bili/score.py if
 you want a different default bias (for example, keep more follows).
+
+Since v0.1.2 (FOR-36) a missing signal is *unknown*, not *worst*: the score is a weighted
+average over the signals you actually provided, and two gates sit on top of the thresholds -
+**without a recency signal a row can never be REMOVE**, and **a bio-only row can never be
+KEEP**. Those rows stay in review for you to confirm. Every row of the report and the CSV
+shows `signals_used` (0-3); when at least half of the rows lack recency the report opens
+with a `missing-signal warning` line, because such a run is a ranking, not an unfollow basis.
 
 ## Extending
 

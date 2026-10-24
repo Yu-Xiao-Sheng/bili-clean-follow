@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
-from .export import (CSV_ENCODING, run, to_csv, to_markdown,
+from .export import (CSV_ENCODING, run, signal_warning, to_csv, to_markdown,
                      to_unfollow_list)
 from .streams import harden_stdio
 from .loaders import SENSITIVE_NAME_RE, load_from_file, refuse_sensitive_path  # noqa: F401
@@ -64,12 +64,14 @@ def _display_rows(results: list) -> list:
         ratio = ""
         if r.get("follower_count") is not None and r.get("following_count") is not None:
             ratio = "%d / %d" % (r["follower_count"], r["following_count"])
-        reasons = (r.get("reason") or [])[:3]
+        reasons = (r.get("reason") or [])[:4]
         rows.append({
             "follower_id": str(r.get("follower_id", "")),
             "nickname": str(r.get("nickname", "")),
             "class": str(r.get("class", "review")),
             "score": r.get("score", 0),
+            # FOR-36: 每行露出用了几个信号（0-3）。
+            "signals_used": r.get("signals_used", 0),
             "last_seen_days": r.get("last_seen_days"),
             "last_video_days": r.get("last_video_days"),
             "ratio": ratio,
@@ -134,6 +136,8 @@ td{vertical-align:top}
 .confirm-row{display:flex;align-items:center;gap:8px;cursor:pointer;margin:10px 0 8px}
 .confirm-row input{cursor:pointer}
 .hint{color:var(--muted);font-size:12px;margin-top:6px}
+.warn{background:#2a1f16;border:1px solid var(--review);color:var(--review);
+  border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px}
 .hidden{display:none}
 </style>
 </head>
@@ -145,6 +149,7 @@ td{vertical-align:top}
   <a class="btn" href="/export?fmt=md" download="bili-clean-report.md">导出 Markdown</a>
   <a class="btn" href="/export?fmt=csv" download="bili-clean-report.csv">导出 CSV（Excel 可直接打开）</a>
 </header>
+__WARNING_HTML__
 <section class="cards">
   <div class="card total">
     <div class="num" id="c-total"></div>
@@ -213,6 +218,7 @@ PAGE_TAIL = """<section class="remove-panel">
     {key:'nickname', label:'昵称', sort:'str'},
     {key:'class', label:'分类', sort:'str'},
     {key:'score', label:'得分', sort:'num'},
+    {key:'signals_used', label:'信号数', sort:'num'},
     {key:'last_seen_days', label:'最近活跃(天)', sort:'num'},
     {key:'last_video_days', label:'最新视频(天)', sort:'num'},
     {key:'ratio', label:'粉丝/关注', sort:'str'},
@@ -275,7 +281,7 @@ PAGE_TAIL = """<section class="remove-panel">
       }).join('');
       return '<tr class="'+esc(r['class'])+'">'+cells+'</tr>';
     }).join('')
-    || '<tr><td colspan="7" class="empty">当前筛选下没有数据。</td></tr>';
+    || '<tr><td colspan="'+COLS.length+'" class="empty">当前筛选下没有数据。</td></tr>';
   }
   Array.prototype.forEach.call(document.querySelectorAll('#tabs .tab'), function(tab){
     tab.addEventListener('click', function(){
@@ -310,6 +316,20 @@ PAGE_TAIL = """<section class="remove-panel">
 </html>
 """
 
+def _html_escape(text) -> str:
+    s = str(text or "")
+    return (s.replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def warning_html(results: list) -> str:
+    """FOR-36: 缺信号警告横幅（无需警告时为空串）。"""
+    warning = signal_warning(results)
+    if not warning:
+        return ""
+    return '<p class="warn">%s</p>' % _html_escape(warning)
+
+
 def build_page_html(results: list, summary: dict, version: str = None) -> str:
     """Render the single page report with the results embedded (ASCII-safe)."""
     if version is None:
@@ -322,6 +342,7 @@ def build_page_html(results: list, summary: dict, version: str = None) -> str:
     page = PAGE_HEAD + PAGE_TAIL
     return (page
             .replace("__VER__", str(version))
+            .replace("__WARNING_HTML__", warning_html(results))
             .replace("__SUMMARY_JSON__", summary_json)
             .replace("__DATA_JSON__", data_json))
 

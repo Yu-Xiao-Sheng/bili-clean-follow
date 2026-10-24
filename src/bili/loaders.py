@@ -138,6 +138,14 @@ def _to_list(data: Any) -> list:
         for key in ("follower", "follow", "data", "list", "items"):
             if isinstance(data.get(key), list):
                 return data[key]
+        # FOR-36: 浏览器里直接复制的真实响应是信封套信封 -
+        # {"code":0,"message":"0","data":{"follower":[...],"total":N}}。
+        # docs/getting-started.md §3 已经承诺这种形状会自动解包，这里补上。
+        inner = data.get("data")
+        if isinstance(inner, dict):
+            for key in ("follower", "follow", "list", "items", "data"):
+                if isinstance(inner.get(key), list):
+                    return inner[key]
     raise ValueError(
         "Could not find a list of follows in the JSON. "
         "Expected a list, a single follow object, or an object with a follower/data/list key."

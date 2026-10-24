@@ -5,7 +5,7 @@ import io
 from typing import List
 
 from .model import FollowRecord
-from .score import classify
+from .score import classify, signals_used
 
 # CSV 一律带 BOM（FOR-38）：Windows 记事本/Excel/WPS 双击打开没有 BOM 的 UTF-8
 # 会按 GBK 猜，中文昵称全部乱码。Markdown 不需要 BOM，保持 utf-8。
@@ -19,6 +19,41 @@ UNFOLLOW_NOTICE = (
     "Report-only: this tool never unfollows anything by itself.\n"
     "# 每行格式 format: mid <TAB> 昵称 nickname\n"
 )
+
+
+# --- FOR-36 可观测性：缺 recency 的行数与报告顶部警告 -------------------------
+# 真实导出（docs/getting-started.md 3 节）只有 identity + bio，recency 与 authority
+# 全靠用户补。当 >=50% 的记录连 recency 都没有时，这份报告只能排序，不能作为
+# 取关依据 - 必须在 md / Web 报告顶部显式说出来，别让用户拿着它去取关。
+MISSING_RECENCY_WARN_RATIO = 0.5
+
+SIGNAL_FILL_HINT = (
+    "先补 last_seen_days / last_video_days / follower_count / following_count"
+    "（bili-merge 会生成已预填 mid + 昵称的待填模板），否则结果不可作为取关依据。"
+    " Fill those signals (bili-merge writes the fill-in template) before using this"
+    " report as an unfollow basis."
+)
+
+
+def recency_missing(result: dict) -> bool:
+    """True when a result row carries no recency signal at all."""
+    return result.get("last_seen_days") is None and result.get("last_video_days") is None
+
+
+def missing_recency_count(results: List[dict]) -> int:
+    return sum(1 for r in results if recency_missing(r))
+
+
+def signal_warning(results: List[dict]) -> str:
+    """One-line warning when most rows lack recency ("" = nothing to warn)."""
+    total = len(results)
+    if not total:
+        return ""
+    missing = missing_recency_count(results)
+    if (missing / float(total)) < MISSING_RECENCY_WARN_RATIO:
+        return ""
+    return ("缺信号警告 missing-signal warning: %d/%d (%d%%) 的记录没有 recency 信号。%s"
+            % (missing, total, int(round(100.0 * missing / total)), SIGNAL_FILL_HINT))
 
 
 def run(records: List[FollowRecord]) -> List[dict]:
@@ -38,6 +73,8 @@ def run(records: List[FollowRecord]) -> List[dict]:
             "last_video_days": rec.last_video_days,
             "follower_count": rec.follower_count,
             "following_count": rec.following_count,
+            # FOR-36: 每行都露出"这次到底用了几个信号"，用户才知道结果可不可信。
+            "signals_used": signals_used(rec),
         })
     return out
 
@@ -45,6 +82,10 @@ def run(records: List[FollowRecord]) -> List[dict]:
 def to_markdown(results: List[dict]) -> str:
     lines = ["# Bili Clean Follow Report", "",
              "Total follows: %d" % len(results), ""]
+    warning = signal_warning(results)
+    if warning:
+        lines.append("> %s" % warning)
+        lines.append("")
     by_class = {}
     for r in results:
         by_class.setdefault(r["class"], []).append(r)
@@ -52,11 +93,11 @@ def to_markdown(results: List[dict]) -> str:
         group = by_class.get(cls, [])
         lines.append("## %s (%d)" % (cls.upper(), len(group)))
         lines.append("")
-        lines.append("| # | Name | Score | Last seen (d) | Last video (d) | Reason |")
-        lines.append("|---|:---|---:|---:|---:|:---|")
+        lines.append("| # | Name | Score | Signals | Last seen (d) | Last video (d) | Reason |")
+        lines.append("|---|:---|---:|---:|---:|---:|:---|")
         for i, r in enumerate(group, 1):
-            lines.append("| %d | %s | %.2f | %s | %s | %s |" % (
-                i, r["nickname"], r["score"],
+            lines.append("| %d | %s | %.2f | %d | %s | %s | %s |" % (
+                i, r["nickname"], r["score"], int(r.get("signals_used") or 0),
                 _fmt(r["last_seen_days"]), _fmt(r["last_video_days"]),
                 _clean_pipe(str(r["reason"][:120]))))
         lines.append("")
@@ -65,7 +106,8 @@ def to_markdown(results: List[dict]) -> str:
 
 def to_csv(results: List[dict]) -> str:
     fields = ["follower_id", "nickname", "class", "score",
-              "last_seen_days", "last_video_days", "follower_count", "following_count"]
+              "last_seen_days", "last_video_days", "follower_count", "following_count",
+              "signals_used"]
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
     w.writeheader()

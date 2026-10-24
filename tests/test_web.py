@@ -185,3 +185,48 @@ def test_sensitive_input_refused():
 def test_load_report_missing_file(tmp_path):
     with pytest.raises(OSError):
         web.load_report(str(tmp_path / "nope.json"))
+
+
+MINIMAL_FIXTURE = Path(__file__).resolve().parent / "fixture-minimal.json"
+
+
+class TestMissingSignalBanner:
+    """FOR-36 规则 4：Web 报告顶部也要打缺信号警告。"""
+
+    def test_banner_shown_for_minimal_export(self):
+        results = web.load_report(str(MINIMAL_FIXTURE))
+        html = web.build_page_html(results, web.summarize(results))
+        assert 'class="warn"' in html
+        assert "missing-signal warning" in html
+        assert "last_seen_days" in html
+
+    def test_banner_hidden_for_full_signal_sample(self):
+        results = export_run(demo.generate(SAMPLE_COUNT, SAMPLE_SEED))
+        html = web.build_page_html(results, web.summarize(results))
+        assert 'class="warn"' not in html
+        assert "missing-signal warning" not in html
+
+    def test_no_placeholder_left_in_page(self):
+        results = export_run(demo.generate(6, SAMPLE_SEED))
+        html = web.build_page_html(results, web.summarize(results))
+        assert "__WARNING_HTML__" not in html
+
+
+class TestSignalsUsedColumnInWeb:
+    def test_page_and_api_carry_signals_used(self):
+        results = export_run(demo.generate(6, SAMPLE_SEED))
+        html = web.build_page_html(results, web.summarize(results))
+        assert "signals_used" in html
+        srv = _start_server(results)
+        try:
+            status, _, body = _get(_base(srv), "/api/results")
+            rows = json.loads(body.decode("utf-8"))["rows"]
+            assert rows and all(r["signals_used"] == 3 for r in rows)
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+    def test_minimal_export_rows_show_zero_or_one_signal(self):
+        rows = web._display_rows(web.load_report(str(MINIMAL_FIXTURE)))
+        assert rows
+        assert all(r["signals_used"] <= 1 for r in rows)

@@ -22,12 +22,13 @@ to unfollow.
   and CSV / unfollow-list files are utf-8-sig so Excel shows Chinese correctly.
 - **Companion tool `bili-merge`**: writes a signals.csv template with mid +
   nickname already filled in, so you only type four numbers; fully offline.
-- **Neutral on missing data** — a follow with no signals is never auto-kept.
+- **Missing data means unknown, not worst-case**: the score is normalized over the signals you actually provided, then two gates apply - no recency signal means never REMOVE (gate A), a bio-only record means never KEEP (gate B). Those rows land in review for you to confirm.
+- **Missing signals are called out**: every row exports `signals_used` (0-3), and when at least half of the rows lack recency the Markdown and web reports show an explicit warning telling you to fill the signals with `bili-merge` first.
 - **No committed credentials**; works from a user-provided JSON export.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13; verified locally on 3.13.15, 63 tests green).
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13; verified locally on 3.13.15, 149 tests green).
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 
@@ -110,6 +111,8 @@ Three weighted signals (see [docs/scoring-model.md](docs/scoring-model.md)):
 - **relevance (0.25)** — bio quality + official/verified marker.
 
 Thresholds: score >= 0.70 -> keep, >= 0.40 -> review, else remove.
+
+The score is a weighted average over the **provided** signals only: `score = sum(w_k*p_k) / sum(w_k)` (since v0.1.2, FOR-36). Two gates apply: **no recency signal -> never REMOVE** (unknown is not evidence to unfollow) and **keep requires recency or authority**. See [docs/scoring-model.md](docs/scoring-model.md).
 
 ## Project layout
 

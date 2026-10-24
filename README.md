@@ -24,12 +24,13 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 - **导出** Markdown（给人看）和 CSV（带 UTF-8 BOM，Excel / WPS 双击打开不乱码），以及可选的"取关候选清单"（每行 mid + Tab + 昵称，能直接在 B站 关注页核对）。
 - **中文控制台安全**：Windows 中文环境（GBK）下昵称含 emoji 也不会崩，报告照常产出。
 - **补信号伴生工具 `bili-merge`**：生成已预填 mid + 昵称的 signals.csv 模板，你只填 4 个数字，合并后重跑；纯本地，不联网、不调 B站 API。
-- **数据缺失时中立**——没有信号的账号永远不会被自动保留。
+- **数据缺失按「未知」处理，不按「最差」处理**：分数只对已提供的信号归一化，再叠两道闸门——缺 recency 的记录不得判 remove（闸门 A），只有简介（哪怕写着「官方认证」）的记录不得判 keep（闸门 B），它们统统落到 review 等你确认。
+- **缺信号会被明确告知**：报告每行带 `signals_used`（本次用了几个信号，0–3）；当本次运行超过一半记录缺 recency 时，Markdown 与 Web 报告顶部打一行警告，提示先用 `bili-merge` 补信号，否则结果不可作为取关依据。
 - **不提交凭据**；基于用户提供的 JSON 导出工作。
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13；本轮实测 Python 3.13.15，63 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13；本轮实测 Python 3.13.15，149 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
@@ -101,6 +102,9 @@ python -m bili.web --input sample-follows.json
 - **relevance（0.25）** —— 简介质量 + 官方/认证标记。
 
 阈值：score >= 0.70 为 keep，>= 0.40 为 review，其余为 remove。
+
+分数只对**已提供**的信号归一化：`score = Σ(w_k·p_k) / Σ(w_k)`，分母只含已提供信号的权重（v0.1.2 起，FOR-36）。
+两道闸门：**缺 recency 不得判 remove**（未知不是取关证据）；**keep 至少要提供 recency 或 authority 之一**。细则见 [docs/scoring-model.md](docs/scoring-model.md)。
 
 ## 项目结构
 

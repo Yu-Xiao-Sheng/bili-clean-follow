@@ -4,8 +4,8 @@ import argparse
 import sys
 
 from . import __version__
-from .export import (CSV_ENCODING, TEXT_ENCODING, run, to_csv,
-                     to_markdown, to_unfollow_list)
+from .export import (CSV_ENCODING, TEXT_ENCODING, run, signal_warning,
+                     to_csv, to_markdown, to_unfollow_list)
 from .loaders import load_from_file
 from .streams import harden_stdio, safe_write
 
@@ -41,6 +41,10 @@ def main(argv=None) -> int:
         return 2
 
     results = run(records)
+    warning = signal_warning(results)
+    if warning:
+        # FOR-36: 缺信号时先把话说在前面，别让用户拿这份报告去取关。
+        print(warning, file=sys.stderr)
     md = to_markdown(results)
 
     if args.md:

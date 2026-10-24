@@ -6,7 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bili.loaders import load_from_text, load_from_file, _to_list
+from bili.loaders import (load_from_text, load_from_file, load_raw_from_file,
+                     _to_list)
 from bili.model import FollowRecord
 
 
@@ -95,3 +96,69 @@ class TestToList:
     def test_unknown_dict_raises(self):
         with pytest.raises(ValueError):
             _to_list({"a": 1, "b": 2})
+
+
+class TestBomInput:
+    """FOR-36 / FOR-35：记事本、Excel另存的 UTF-8 BOM 输入不能再报错。"""
+
+    BOM = "\ufeff"
+
+    def _write(self, tmp_path, name, text):
+        p = tmp_path / name
+        p.write_bytes(text.encode("utf-8"))
+        return p
+
+    def test_load_from_file_strips_bom(self, tmp_path):
+        p = self._write(tmp_path, "f.json", self.BOM + json.dumps([
+            {"follower_id": "a", "nickname": "a"}]))
+        recs = load_from_file(str(p))
+        assert len(recs) == 1 and recs[0].follower_id == "a"
+
+    def test_bom_chinese_nickname_survives(self, tmp_path):
+        p = self._write(tmp_path, "f.json",
+                        self.BOM + json.dumps([{"mid": "1", "nickname": "\u4e2d\u6587"}],
+                                              ensure_ascii=False))
+        recs = load_from_file(str(p))
+        assert recs[0].nickname == "\u4e2d\u6587"
+
+    def test_bom_plus_crlf_plus_indent_is_loadable(self, tmp_path):
+        body = json.dumps({"follower": [{"follower_id": "x", "nickname": "x"}]},
+                          indent=2)
+        p = self._write(tmp_path, "f.json", self.BOM + body.replace("\n", "\r\n"))
+        assert len(load_from_file(str(p))) == 1
+
+    def test_load_raw_from_file_strips_bom(self, tmp_path):
+        p = self._write(tmp_path, "s.csv.json",
+                        self.BOM + json.dumps([{"mid": "7", "nickname": "n"}]))
+        raw = load_raw_from_file(str(p))
+        assert raw == [{"mid": "7", "nickname": "n"}]
+
+    def test_load_from_text_with_bom_raises_like_json(self):
+        # load_from_text 是纯文本入口：BOM 归调用方（文件读取已用 utf-8-sig）。
+        with pytest.raises(ValueError):
+            load_from_text(self.BOM + "[]")
+
+
+class TestRealResponseEnvelope:
+    """FOR-36：浏览器里直接复制的真实关注列表响应。"""
+
+    def test_nested_data_follower_envelope(self):
+        body = {"code": 0, "message": "0", "ttl": 0,
+                "data": {"follower": [{"mid": "1", "uname": "a"},
+                                      {"mid": "2", "uname": "b"}], "total": 2}}
+        recs = load_from_text(json.dumps(body))
+        assert len(recs) == 2
+        assert recs[0].follower_id == "1"
+
+    def test_nested_data_list_key(self):
+        body = {"code": 0, "data": {"list": [{"mid": "9", "nickname": "n"}]}}
+        assert len(load_from_text(json.dumps(body))) == 1
+
+    def test_nested_data_single_object_still_raises(self):
+        with pytest.raises(ValueError):
+            load_from_text('{"data": {"follower_id": "x"}}')
+
+    def test_uname_only_rows_get_a_nickname(self):
+        recs = load_from_text(json.dumps([{"mid": "3", "uname": "\u963f\u82b1", "sign": "\u6444\u5f71"}]))
+        assert recs[0].nickname == "\u963f\u82b1"
+        assert recs[0].bio == "\u6444\u5f71"

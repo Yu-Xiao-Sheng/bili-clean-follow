@@ -29,7 +29,10 @@ class FollowRecord:
         return cls(
             # follower_id is primary; mid is only a fallback (docs/spec.md)
             follower_id=str(d.get("follower_id", d.get("mid", ""))),
-            nickname=d.get("nickname", d.get("follower_name", "")),
+            # uname 是 B站 关注列表响应里的真实昵称字段（FOR-36：真实导出只有
+            # mid + uname + sign + face，认不出 uname 会让取关清单变成一串空名字）。
+            nickname=(d.get("nickname") or d.get("follower_name")
+                      or d.get("uname") or d.get("name") or ""),
             bio=d.get("bio", d.get("sign", d.get("description", ""))),
             mid=d.get("mid"),
             last_seen_days=d.get("last_seen_days"),

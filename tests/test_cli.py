@@ -68,11 +68,12 @@ def test_cli_unfollow_list_only_remove(tmp_path):
     out = run_cli(str(FIXTURE), "--unfollow-list", str(tmp_path / "unfollow.txt"))
     assert out.returncode == 0
     lines = _unfollow_lines(tmp_path / "unfollow.txt")
-    # only REMOVE-class rows are written: U100003 and U100004 (no signals)
-    assert [c[0] for c in lines] == ["mid100003", "mid100004"]
+    # FOR-36: only U100003 is REMOVE (stale + weak authority, signals known).
+    # U100004 carries identity only -> 闸门 A 把它留在 review，不再进取关清单。
+    assert [c[0] for c in lines] == ["mid100003"]
     assert all(mid.startswith("mid") for mid, _ in lines)
     # FOR-38: mid alone is useless - every row carries the nickname too.
-    assert [name for _, name in lines] == ["阿远03", "青禾04"]
+    assert [name for _, name in lines] == ["阿远03"]
 
 
 def test_cli_unfollow_list_carries_manual_only_notice(tmp_path):
@@ -197,3 +198,62 @@ def _unfollow_lines(path):
         mid, _, name = line.partition("\t")
         rows.append((mid.strip(), name.strip()))
     return rows
+
+
+class TestMissingSignalsAreNotEvidence:
+    """FOR-36 验收：真实最小导出不能一边倒 remove。"""
+
+    def _summary(self, stderr):
+        import re
+        m = re.search(r"Summary: keep=(\d+) review=(\d+) remove=(\d+)", stderr)
+        assert m, stderr
+        return [int(x) for x in m.groups()]
+
+    def test_minimal_export_is_all_review_not_remove(self, tmp_path):
+        out = run_cli(str(MINIMAL_FIXTURE), "--csv", str(tmp_path / "r.csv"))
+        assert out.returncode == 0, out.stderr
+        assert self._summary(out.stderr) == [0, 13, 0]
+
+    def test_minimal_export_unfollow_list_is_empty(self, tmp_path):
+        out = run_cli(str(MINIMAL_FIXTURE), "--unfollow-list", str(tmp_path / "u.txt"))
+        assert out.returncode == 0, out.stderr
+        assert _unfollow_lines(tmp_path / "u.txt") == []
+
+    def test_minimal_export_prints_missing_signal_warning(self, tmp_path):
+        md = tmp_path / "r.md"
+        out = run_cli(str(MINIMAL_FIXTURE), "--md", str(md))
+        assert out.returncode == 0, out.stderr
+        assert "\u7f3a\u4fe1\u53f7\u8b66\u544a" in out.stderr
+        assert "last_seen_days" in out.stderr
+        text = md.read_text(encoding="utf-8")
+        assert "missing-signal warning" in text
+        assert text.index("missing-signal warning") < text.index("## KEEP")
+
+    def test_minimal_export_csv_exposes_signals_used(self, tmp_path):
+        csv_path = tmp_path / "r.csv"
+        out = run_cli(str(MINIMAL_FIXTURE), "--csv", str(csv_path))
+        assert out.returncode == 0, out.stderr
+        lines = csv_path.read_bytes().decode("utf-8-sig").strip().splitlines()
+        assert lines[0].split(",")[-1] == "signals_used"
+        used = {row.split(",")[-1] for row in lines[1:]}
+        assert used <= {"0", "1"}, used
+
+    def test_full_signal_fixture_still_produces_removes(self, tmp_path):
+        unfollow = tmp_path / "u.txt"
+        out = run_cli(str(FULL_FIXTURE), "--unfollow-list", str(unfollow))
+        assert out.returncode == 0, out.stderr
+        keep, review, remove = self._summary(out.stderr)
+        assert keep >= 1 and remove >= 1, "\u53d6\u5173\u5224\u5b9a\u4e0d\u80fd\u88ab\u524a\u5f31"
+        assert len(_unfollow_lines(unfollow)) == remove
+        assert "\u7f3a\u4fe1\u53f7\u8b66\u544a" not in out.stderr
+
+    def test_gbk_console_survives_the_chinese_warning_line(self, tmp_path):
+        out = run_cli(str(MINIMAL_FIXTURE), cwd=tmp_path,
+                      env={"PYTHONIOENCODING": "gbk"})
+        assert out.returncode == 0, out.stderr
+        assert "Traceback" not in out.stderr
+        assert "Summary:" in out.stderr
+
+
+MINIMAL_FIXTURE = Path(__file__).resolve().parent / "fixture-minimal.json"
+FULL_FIXTURE = Path(__file__).resolve().parent / "fixture-full-signals.json"

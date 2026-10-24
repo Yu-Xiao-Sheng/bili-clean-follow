@@ -1,0 +1,87 @@
+{
+  "code": 0,
+  "message": "0",
+  "data": {
+    "follower": [
+      {
+        "mid": "300000",
+        "uname": "阿花",
+        "sign": "分享摄影与后期",
+        "face": "https://example.invalid/avatar_0.jpg"
+      },
+      {
+        "mid": "300137",
+        "uname": "山河",
+        "sign": "",
+        "face": "https://example.invalid/avatar_1.jpg"
+      },
+      {
+        "mid": "300274",
+        "uname": "草木",
+        "sign": "旅行日记",
+        "face": "https://example.invalid/avatar_2.jpg"
+      },
+      {
+        "mid": "300411",
+        "uname": "老周",
+        "sign": "",
+        "face": "https://example.invalid/avatar_3.jpg"
+      },
+      {
+        "mid": "300548",
+        "uname": "小鹿",
+        "sign": "官方认证的媒体账号，每日更新",
+        "face": "https://example.invalid/avatar_4.jpg"
+      },
+      {
+        "mid": "300685",
+        "uname": "阿远",
+        "sign": "",
+        "face": "https://example.invalid/avatar_5.jpg"
+      },
+      {
+        "mid": "300822",
+        "uname": "青禾",
+        "sign": "画画和猫",
+        "face": "https://example.invalid/avatar_6.jpg"
+      },
+      {
+        "mid": "300959",
+        "uname": "木子",
+        "sign": "",
+        "face": "https://example.invalid/avatar_7.jpg"
+      },
+      {
+        "mid": "301096",
+        "uname": "风铃",
+        "sign": "日常 vlog",
+        "face": "https://example.invalid/avatar_8.jpg"
+      },
+      {
+        "mid": "301233",
+        "uname": "南野",
+        "sign": "",
+        "face": "https://example.invalid/avatar_9.jpg"
+      },
+      {
+        "mid": "301370",
+        "uname": "拾光",
+        "sign": "读书会",
+        "face": "https://example.invalid/avatar_10.jpg"
+      },
+      {
+        "mid": "301507",
+        "uname": "青灯",
+        "sign": "",
+        "face": "https://example.invalid/avatar_11.jpg"
+      },
+      {
+        "mid": "301644",
+        "uname": "云归",
+        "sign": "城市漩边",
+        "face": "https://example.invalid/avatar_12.jpg"
+      }
+    ],
+    "total": 13
+  }
+}

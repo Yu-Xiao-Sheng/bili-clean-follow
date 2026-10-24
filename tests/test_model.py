@@ -33,6 +33,14 @@ class TestFromDict:
         assert FollowRecord.from_dict({"follower_id": "x", "follower_name": "B"}).nickname == "B"
         assert FollowRecord.from_dict({"follower_id": "x"}).nickname == ""
 
+    def test_uname_is_the_real_bilibili_nickname_field(self):
+        # FOR-36: 真实导出里昵称字段是 uname，认不出它取关清单就只剩空名字。
+        r = FollowRecord.from_dict({"mid": "300000", "uname": "阿花", "sign": "摄影"})
+        assert r.nickname == "阿花"
+        assert r.bio == "摄影"
+        # nickname 仍然是第一优先，不能被 uname 覆盖。
+        assert FollowRecord.from_dict({"mid": "1", "nickname": "N", "uname": "U"}).nickname == "N"
+
     def test_bio_fallbacks(self):
         assert FollowRecord.from_dict({"follower_id": "x", "bio": "x"}).bio == "x"
         assert FollowRecord.from_dict({"follower_id": "x", "sign": "y"}).bio == "y"
