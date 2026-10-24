@@ -50,10 +50,23 @@ BADGE_RE = re.compile(r'<span class="b-(keep|review|remove)"')
 NICK, CLS, SCORE, SIGNALS, SEEN, VIDEO, RATIO, REASON = range(8)
 NCOLS = 8
 
+# 排序取证（FOR-58 W-5）：state 里没有 sort 字段，数值列曾经永远按字典序。
+KEY_COL = {"nickname": NICK, "class": CLS, "score": SCORE, "signals_used": SIGNALS,
+           "last_seen_days": SEEN, "last_video_days": VIDEO, "ratio": RATIO,
+           "reason": REASON}
+NUMERIC_KEYS = ("score", "last_seen_days", "last_video_days")
+
+# 排序夹具：3.14 / 20 / 100 / 空。字典序会把 100 排到 20 前面，数值序不会。
+SORT_NICKS = ["seen-3", "seen-20", "seen-100", "seen-none"]
+SORT_SEEN = [3.14, 20, 100, None]
+# 另一列数值故意排成不同顺序：按 last_video_days 排时行序必须跟着它走。
+SORT_VIDEO = [5, 200, 30, None]
+
 # 对抗性夹具：昵称长得像数字 / 含 HTML / 为空，数字列要保留精度。
-ADVERSARIAL_NICKS = ["3.14", "1e3", "<img src=x onerror=alert(1)>", ""]
-ADVERSARIAL_SEEN = [3.14, 100, None, None]
-ADVERSARIAL_RATIO = [(1000, 10), (50, 10), (900, 10), (None, None)]
+ADVERSARIAL_NICKS = ["3.14", "1e3", "<img src=x onerror=alert(1)>", "",
+                     "x</SCRIPT><!--<script>alert(1)-->"]
+ADVERSARIAL_SEEN = [3.14, 100, None, None, 7]
+ADVERSARIAL_RATIO = [(1000, 10), (50, 10), (900, 10), (None, None), (20, 5)]
 
 
 def find_browser() -> str:
@@ -106,6 +119,23 @@ def adversarial_fixture(path) -> list:
     return follower
 
 
+def sort_fixture(path) -> list:
+    """数值跨度够大的夹具：字典序 100 < 20 < 3.14，数值序反过来。"""
+    follower = []
+    for i, nick in enumerate(SORT_NICKS):
+        rec = {"mid": 41000 + i, "name": nick, "sign": "排序夹具 %d" % i}
+        if SORT_SEEN[i] is not None:
+            rec["last_seen_days"] = SORT_SEEN[i]
+        if SORT_VIDEO[i] is not None:
+            rec["last_video_days"] = SORT_VIDEO[i]
+        follower.append(rec)
+    payload = {"code": 0, "data": {"follower": follower, "total": len(follower)}}
+    path = pathlib.Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    return follower
+
+
 def start_server(input_path, port: int) -> subprocess.Popen:
     env = dict(os.environ, PYTHONPATH=str(REPO_ROOT / "src"), PYTHONUTF8="1")
     return subprocess.Popen(
@@ -147,7 +177,12 @@ def embedded_rows(dom: str) -> list:
     match = DATA_RE.search(dom)
     if not match:
         return []
-    return json.loads(match.group(1))
+    try:
+        return json.loads(match.group(1))
+    except ValueError:
+        # 昵称里的 </SCRIPT> 会把这段 script 元素提前关掉，JSON 只剩半截 -
+        # 这是要报的缺陷，不该让取证脚本自己崩（FOR-58）。
+        return []
 
 
 def tbody_of(dom: str) -> str:
@@ -247,6 +282,57 @@ def check_text_and_number_columns(tbody: str, label: str) -> list:
                      % (label, _cell(blank_row, SEEN), _cell(blank_row, RATIO)))
     return fails
 
+def rendered_column(tbody: str, key: str) -> list:
+    """按渲染顺序取某一列的文本（排序取证就看这个顺序）。"""
+    idx = KEY_COL[key]
+    return [_cell(cells, idx) for cells in cells_of(tbody) if cells]
+
+
+def check_sort(tbody: str, rows: list, key: str, direction: int, label: str) -> list:
+    """渲染顺序是否真的按数值（或文本）单调，空值是否始终垫到最后（FOR-58 验收 3）。
+
+    只比同类型：数值列取浮点，文本列取字符串。字典序的坏法（100 排在 20 前）
+    在单调性上立刻露馅，所以不需要复刻 JS 比较器。
+    """
+    fails = []
+    dom_rows = cells_of(tbody)
+    if len(dom_rows) != len(rows):
+        return ["%s: sort=%s 渲染行数 %d != 数据行数 %d"
+                % (label, key, len(dom_rows), len(rows))]
+    numeric = key in NUMERIC_KEYS
+    values = []
+    for text in rendered_column(tbody, key):
+        if text == "\u2014":
+            values.append(None)
+        elif numeric:
+            try:
+                values.append(float(text))
+            except ValueError:
+                fails.append("%s: sort=%s 数值列渲染成非数字 %r" % (label, key, text))
+        else:
+            values.append(text)
+    present = [v for v in values if v is not None]
+    data_present = [r.get(key) for r in rows if r.get(key) not in (None, "")]
+    if len(present) != len(data_present):
+        fails.append("%s: sort=%s 渲染出 %d 个非空值，数据里有 %d 个"
+                     % (label, key, len(present), len(data_present)))
+    gap = False
+    for pos, v in enumerate(values):
+        if v is None:
+            gap = True
+        elif gap:
+            fails.append("%s: sort=%s dir=%s 空值没排在最后（第 %d 行后又出现值）"
+                         % (label, key, "asc" if direction > 0 else "desc", pos + 1))
+            break
+    for a, b in zip(present, present[1:]):
+        bad = (b < a) if direction > 0 else (a < b)
+        if bad:
+            fails.append("%s: sort=%s %s 出现逆序 %r 之后是 %r（按字典序排的？）"
+                         % (label, key, "升序" if direction > 0 else "降序", a, b))
+            break
+    return fails
+
+
 def free_port() -> int:
     """找一个空闲端口，避免和并行的测试撞车。"""
     with contextlib.closing(socket.socket(socket.AF_INET)) as sock:
@@ -254,8 +340,13 @@ def free_port() -> int:
         return sock.getsockname()[1]
 
 
-def collect(input_path, port: int, browser: str, dump_out: str = "") -> dict:
-    """起 bili.web -> headless chromium --dump-dom -> 收集渲染层断言所需材料。"""
+def collect(input_path, port: int, browser: str, dump_out: str = "",
+            sort_checks=()) -> dict:
+    """起 bili.web -> headless chromium --dump-dom -> 收集渲染层断言所需材料。
+
+    sort_checks: [(列名, 方向)] - 每个组合再 dump 一次 ?sort=<key>&dir=<asc|desc>，
+    因为 --dump-dom 不会点表头，排序只能从 URL 预置（web.py 的 seedSort）。
+    """
     proc = start_server(input_path, port)
     tmp = tempfile.mkdtemp(prefix="bili-render-")
     try:
@@ -270,9 +361,16 @@ def collect(input_path, port: int, browser: str, dump_out: str = "") -> dict:
             pathlib.Path(dump_out).parent.mkdir(parents=True, exist_ok=True)
             pathlib.Path(dump_out).write_text(dom, encoding="utf-8")
         tbody = tbody_of(dom)
+        sorts = []
+        for i, (key, direction) in enumerate(sort_checks):
+            query = "http://127.0.0.1:%d/?sort=%s&dir=%s" % (
+                port, key, "asc" if direction > 0 else "desc")
+            sdom = dump_dom(browser, query, os.path.join(tmp, "profile-sort-%d" % i))
+            sorts.append({"key": key, "dir": direction, "dom": sdom,
+                          "tbody": tbody_of(sdom), "rows": embedded_rows(sdom)})
         return {"ok": True, "label": pathlib.Path(input_path).name, "dom": dom,
                 "tbody": tbody, "rows": embedded_rows(dom), "api_count": api_count,
-                "dom_rows": cells_of(tbody)}
+                "dom_rows": cells_of(tbody), "sorts": sorts}
     finally:
         proc.terminate()
         try:
@@ -296,6 +394,16 @@ def assertions(result: dict, check_numbers: bool = False) -> list:
     fails = check_render(result["tbody"], result["rows"], label)
     if check_numbers:
         fails += check_text_and_number_columns(result["tbody"], label)
+    # FOR-58 W-5：页面默认就是「得分 降序」，所以不加任何 query 也能证明
+    # 数值列到底按数值排还是按字典序排（字典序下 3.14 会跑到 20 前面）。
+    fails += check_sort(result["tbody"], result["rows"], "score", -1, label)
+    for sort_page in result.get("sorts", []):
+        if not sort_page["rows"]:
+            fails.append("%s: sort=%s 那一页的 bili-data 解析不出行"
+                         % (label, sort_page["key"]))
+            continue
+        fails += check_sort(sort_page["tbody"], sort_page["rows"], sort_page["key"],
+                            sort_page["dir"], label)
     return fails
 
 
@@ -356,6 +464,22 @@ def main(argv=None) -> int:
         rc = 1
     else:
         print("[probe] 渲染层断言全部通过")
+
+    # FOR-58 W-5：数值列排序取证。--dump-dom 不会点表头，所以排序列/方向从 URL 预置。
+    sortfx = REPO_ROOT / "tmp" / "fixture-sort-shape.json"
+    sort_fixture(sortfx)
+    srt = collect(sortfx, free_port(), browser,
+                  sort_checks=(("last_seen_days", 1), ("last_seen_days", -1),
+                               ("last_video_days", 1)))
+    print_report(srt, dom_chars=400)
+    srt_fails = assertions(srt)
+    if srt_fails:
+        print("[probe] 失败 %d 项:" % len(srt_fails))
+        for item in srt_fails:
+            print("  FAIL  %s" % item)
+        rc = 1
+    else:
+        print("[probe] 排序取证通过（3.14 < 20 < 100，空值垫底）")
     return rc
 
 

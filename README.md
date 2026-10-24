@@ -34,7 +34,7 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，233 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，244 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
@@ -131,7 +131,9 @@ python -m bili.web --input sample-follows.json
 
 打开 http://127.0.0.1:8787 即可看到：
 - 摘要卡：总关注数与 keep / review / remove 三类各自的数量与占比；
-- 可筛选（分类 tab）、可排序的完整分类表（昵称/分类/得分/最近活跃/最新视频/粉丝比/原因）；
+- 可筛选（分类 tab）、可排序的完整分类表（昵称/分类/得分/最近活跃/最新视频/粉丝比/原因）：
+  点表头切换排序列，再点一次换方向，当前列标 ↑ / ↓；「得分」「最近活跃(天)」「最新视频(天)」按数值排
+  （20 排在 100 前），也可以直接用链接预置，例如 `http://127.0.0.1:8787/?sort=last_seen_days&dir=asc`；
 - 删除候选预览：逐一确认后一键导出取关清单 (.txt)；
 - 一键导出 Markdown / CSV 报告。
 

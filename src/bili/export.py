@@ -31,6 +31,16 @@ MISSING_RECENCY_WARN_RATIO = 0.5
 # CSV 数据层不翻译：signals_used 存信号名（全缺时是空串），missing_signals 存补集。
 UNKNOWN_SIGNAL_LABEL = "未知"
 
+# FOR-58 W-4：这份 _html_escape 原来是 web.py 私有的（只有 warning_html 在用），
+# 现在搬到 export，web.py 改成 import - 全仓唯一一份转义实现。
+# 根因：Markdown 报告的 Name 列谁都没过，昵称里的 <script> / <img onerror>
+# 被原样写进 report.md，用户用浏览器或 Typora 预览报告就直接执行。
+# CSV 是数据层，不做转义（转义只属于显示层）。
+def _html_escape(text) -> str:
+    s = str(text or "")
+    return (s.replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
 SIGNAL_FILL_HINT = (
     "先补 last_seen_days / last_video_days / follower_count / following_count"
     "（bili-merge 会生成已预填 mid + 昵称的待填模板），否则结果不可作为取关依据。"
@@ -138,10 +148,12 @@ def to_markdown(results: List[dict]) -> str:
         lines.append("| # | Name | Score | Signals | Last seen (d) | Last video (d) | Reason |")
         lines.append("|---|:---|---:|---:|---:|---:|:---|")
         for i, r in enumerate(group, 1):
+            # FOR-58 W-3/W-4：昵称完全来自用户侧数据，必须先过单元格转义
+            # （旧代码只有 reason 过了 _clean_pipe，昵称原样进表格）。
             lines.append("| %d | %s | %.2f | %s | %s | %s | %s |" % (
-                i, r["nickname"], r["score"], signal_display(r),
+                i, _md_cell(r["nickname"]), r["score"], signal_display(r),
                 _fmt(r["last_seen_days"]), _fmt(r["last_video_days"]),
-                _clean_pipe(str(r["reason"][:120]))))
+                _md_cell(str(r["reason"][:120]))))
         lines.append("")
     return "\n".join(lines)
 
@@ -190,3 +202,17 @@ def _fmt(v):
 
 def _clean_pipe(s):
     return s.replace("|", "\\|")
+
+
+def _md_cell(value) -> str:
+    r"""Markdown 表格单元格（FOR-58）：HTML 转义 + 反斜杠/竖线转义 + 折行压平。
+
+    昵称里一根没转义的 `|` 就把 7 列的表格撑成 8 列（W-3），换行会把一行截成
+    两行，`<img onerror=...>` 会被 Markdown 预览器执行（W-4）。
+    顺序要紧：先把反斜杠翻倍，再转义竖线，否则昵称自带的 `\` 会把我们补的
+    `\|` 顶掉，竖线又变回分隔符。
+    """
+    s = _html_escape(value).replace("\\", "\\\\")
+    for ch in ("\r\n", "\r", "\n", "\t"):
+        s = s.replace(ch, " ")
+    return _clean_pipe(s)
