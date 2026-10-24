@@ -39,3 +39,21 @@ auth*.json
 *.pfx
 .env.*
 secrets/
+
+# 本地跑出来的报告与中间产物（README 里让用户自己生成，不提交）
+sample-follows.json
+follows.merged.json
+report.md
+report.csv
+to-unfollow.txt
+out-report.*
+out-unfollow.*
+real_flat*.json
+real_flat_report.md
+real_bili_shape.json
+signals*.csv
+
+# promo（Remotion 视频工程）：源码提交，产物不提交
+promo/out/
+promo/.remotion/
+promo/public/audio/
