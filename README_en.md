@@ -6,6 +6,8 @@ An open-source tool that analyzes your Bilibili follow list and classifies each
 follow into **keep / review / remove** with explainable reasons — so you can
 clean up stale, inactive, or low-value follows with confidence.
 
+> 🎬 **Two ~60-second films** (1080p, with audio): [product intro](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4) · [walkthrough](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+
 ## Why
 You may have a few hundred (or thousand) Bilibili follows, many of which you
 no longer remember following. Manually going through them is painful. This tool
