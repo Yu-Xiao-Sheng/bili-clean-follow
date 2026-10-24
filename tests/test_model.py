@@ -142,6 +142,15 @@ class TestOfficialCertification:
         assert r.extra["tag"] == "a"
         assert r.extra["official_title"] == "T"
 
+    def test_face_goes_into_extra(self):
+        # FOR-37 验收口径里的字段别名：face -> extra.face。
+        r = FollowRecord.from_dict({"mid": "22000", "name": "人民日报",
+                                    "face": "//static.hdslb.com/images/a.png"})
+        assert r.extra["face"] == "//static.hdslb.com/images/a.png"
+        # 空串与空白不落键，非字符串不崩。
+        assert FollowRecord.from_dict({"mid": "1", "face": "  "}).extra == {}
+        assert FollowRecord.from_dict({"mid": "2", "face": None}).extra == {}
+
     def test_extra_is_not_shared_between_records(self):
         a = FollowRecord.from_dict({"mid": "1", "nickname": "a",
                                     "official": {"title": "T"}})

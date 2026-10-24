@@ -46,8 +46,19 @@ privacy-safe way to get one:
    - If the body looks like {"code":0,"data":{"follower":[...]}}, the loader unwraps
      the follower / data / list keys automatically - including the nested
      data.follower envelope you get by copying the browser response verbatim.
-   - In that response the display name is `uname`; the loader maps it to nickname, so
-     the unfollow list still carries names (FOR-36).
+   - In that response the display name is `uname` (some endpoints use `name`); the loader
+     maps it to nickname, so the unfollow list still carries names (FOR-36).
+   - Certification is read from fields, not from bio wording: `official.role/title/department`,
+     flat `official_*` keys and `official_verify.type > 0` become `extra.official_*` and feed
+     the relevance signal; `face` is kept as `extra.face` (FOR-37).
+   - Reference fixture you can run as-is: `tests/fixture-bili-real.json` (20 rows in the
+     `code/data.follower` envelope, three certified accounts, one emoji nickname) and its
+     `data.list` variant `tests/fixture-bili-real-list.json`:
+
+     ```
+     python -m bili tests/fixture-bili-real.json --md report.md --csv report.csv
+     # Summary: keep=0 review=20 remove=0  (no signal was invented for the missing ones)
+     ```
    - Optionally enrich each object with last_seen_days / last_video_days /
      follower_count / following_count to get a better score. The raw endpoint only
      gives identity + bio + avatar; the richer signals come from the per-profile

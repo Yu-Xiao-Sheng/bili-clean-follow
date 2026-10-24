@@ -75,6 +75,10 @@ class FollowRecord:
         extra = dict(d.get("extra") or {})
         # FOR-37：official / official_verify 识别结果并进 extra，供 relevance 使用。
         extra.update(_official_fields(d))
+        # FOR-37：头像字段 face 也落到 extra（真实导出里它是唯一能人工核对的线索）。
+        face = d.get("face")
+        if isinstance(face, str) and face.strip():
+            extra["face"] = face.strip()
         return cls(
             # follower_id is primary; mid is only a fallback (docs/spec.md)
             follower_id=str(d.get("follower_id", d.get("mid", ""))),
