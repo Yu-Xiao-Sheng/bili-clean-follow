@@ -208,20 +208,34 @@ PAGE_TAIL = """<section class="remove-panel">
     return (s==null ? '' : String(s)).replace(/&/g,'&amp;')
       .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   };
-  function fmtNum(v){
-    if(v==null || v===''){ return '\u2014'; }
-    v = Number(v);
-    if(isNaN(v)){ return esc(String(v)); }
-    return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  var PLACEHOLDER = '\u2014';
+  // FOR-57: 文本列（昵称 / 信号 / 粉丝比）走这里，原样转义，绝不过数字格式化。
+  function fmtText(v){
+    if(v==null || v===''){ return PLACEHOLDER; }
+    return esc(String(v));
   }
+  function fmtNum(v){
+    if(v==null || v===''){ return PLACEHOLDER; }
+    var n = Number(v);
+    // FOR-57 根因：旧代码把参数本身改写成了转换后的数字，
+    // 非数字原值（昵称 / 信号名 / "80 / 3000"）走到「转不动」分支时，
+    // 打印出来的已经是那个数字 ⇒ 页面上出现字面量 "NaN"。
+    // 这里保留原值 v，只把转换结果放进 n；转不动就原样转义输出。
+    if(!isFinite(n)){ return esc(String(v)); }
+    if(Number.isInteger(n)){ return String(n); }
+    // 数字列保留精度：3.14 不得截成 3.1（最多两位，去掉浮点噪声）。
+    return String(Math.round(n*100)/100);
+  }
+  // FOR-57: text:1 的列必须走 fmtText；这三列以前落进 fmtNum 的默认分支，
+  // 在真实浏览器里全渲染成 NaN（HTTP 响应体里却完全正常）。
   var COLS = [
-    {key:'nickname', label:'昵称', sort:'str'},
+    {key:'nickname', label:'昵称', sort:'str', text:1},
     {key:'class', label:'分类', sort:'str'},
     {key:'score', label:'得分', sort:'num'},
-    {key:'signals_used', label:'信号', sort:'str'},
+    {key:'signals_used', label:'信号', sort:'str', text:1},
     {key:'last_seen_days', label:'最近活跃(天)', sort:'num'},
     {key:'last_video_days', label:'最新视频(天)', sort:'num'},
-    {key:'ratio', label:'粉丝/关注', sort:'str'},
+    {key:'ratio', label:'粉丝/关注', sort:'str', text:1},
     {key:'reason', label:'原因', sort:'str'},
   ];
   var state = {cls:'all', key:'score', dir:-1};
@@ -235,7 +249,11 @@ PAGE_TAIL = """<section class="remove-panel">
   });
 
   function badge(c){
-    return '<span class="b-'+c+'>'+esc(c)+'</span>';
+    // FOR-57: 旧写法里 span 的 class 属性少了闭合引号，浏览器把
+    // 尖括号之后一路吞进 class 值，后面所有单元格塌成一坨转义文本。
+    // 属性值和文本都过 esc()，属性里就不可能被引号撬出去。
+    var label = esc(String(c==null?'':c));
+    return '<span class="b-'+label+'">'+label+'</span>';
   }
   function visible(){
     var rs = DATA.slice();
@@ -277,6 +295,7 @@ PAGE_TAIL = """<section class="remove-panel">
         if(c.key==='reason'){
           return '<td class="reason">'+esc(String(r['reason']||'').slice(0,160))+'</td>';
         }
+        if(c.text){ return '<td>'+fmtText(r[c.key])+'</td>'; }
         return '<td>'+fmtNum(r[c.key])+'</td>';
       }).join('');
       return '<tr class="'+esc(r['class'])+'">'+cells+'</tr>';
