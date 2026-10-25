@@ -4,7 +4,17 @@
 
 一个开源工具：分析你的 B站关注列表，把每个关注按 **keep / review / remove** 分类，并给出可解释的原因——让你有把握地清理掉过期、不活跃或低价值关注。
 
-> 🎬 **两支 60 秒的片子**（1080p，带音轨）：[产品介绍片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4) · [使用教程片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+## 演示 · 打开这一页就能看见（两支 60 秒的片子，1080p 带音轨）
+
+![产品介绍片内联预览：58 秒讲清它是什么——打开本页就自动播，不用点、不用下载](assets/preview-promo.gif)
+
+**① 产品介绍片（58 秒）** — [▶ 在线观看（Pages 落地页，浏览器直接播）](https://yu-xiao-sheng.github.io/bili-clean-follow/#promo) · [下载 1080p mp4](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4)
+
+![操作教程片内联预览：从导出数据到看报告的完整流程，会自动循环播](assets/preview-walkthrough.gif)
+
+**② 操作教程片（62 秒）** — [▶ 在线观看（Pages 落地页，浏览器直接播）](https://yu-xiao-sheng.github.io/bili-clean-follow/#walkthrough) · [下载 1080p mp4](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+
+> 上面两张是 **GIF 内联预览**：打开本页就会动。GitHub README 里放不下播放器（mp4 只渲染成下载链接，`<video>` 会被 sanitizer 清掉，YouTube 链接也不会内嵌播放器），所以完整 1080p 影片走 Pages 落地页直接播；B站 / YouTube 站内链接等官方号上传后补上。三条入口的分工、重跑脚本与上线步骤见 [docs/video-hosting.md](docs/video-hosting.md)。
 
 ## 为什么需要
 
@@ -34,7 +44,7 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，247 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，253 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
@@ -115,8 +125,11 @@ python -m bili.web --input sample-follows.json
 ```
 src/bili/        # 包：model, loaders, score, export, cli, demo
 tests/           # pytest 测试套件
-docs/            # spec.md, getting-started.md, scoring-model.md
-.github/         # CI 工作流 + Issue/Discussion 模板
+assets/          # README 内联 GIF 预览 + 影片封面（tools/build_readme_preview.py 产出）
+pages/           # GitHub Pages 落地页源文件（<video controls poster> 播完整 1080p）
+docs/            # spec.md, getting-started.md, scoring-model.md, video-hosting.md
+tools/           # build_readme_preview.py, publish_pages.py, probe_web_render.py
+.github/         # CI 工作流（ci.yml, pages.yml）+ Issue/Discussion 模板
 pyproject.toml
 ```
 
