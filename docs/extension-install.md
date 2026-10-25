@@ -67,7 +67,7 @@ node --version          # 需要 Node 20+
 node --test "tests/extension/*.test.mjs"
 ```
 
-覆盖（84 项）：分页合并与 mid 去重、`fetched == total` 读全门禁、`incomplete` 断点与续抓、
+覆盖（88 项）：分页合并与 mid 去重、`fetched == total` 读全门禁、`incomplete` 断点与续抓、
 错误语义映射（0 / -101 / -352 / 412）、导出格式与 CLI 常量交叉比对、凭据不落盘不外泄、
 manifest 权限最小集与「extension/ 无构建产物」；以及 FOR-64 的：12 类体系与增删改名、
 离线分类在真实形状 fixture 上的结果与「零外发」断言、BYOK 每批 40 条 + JSON schema +

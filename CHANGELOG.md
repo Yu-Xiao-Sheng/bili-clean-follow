@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 
+## [2.0.0-alpha.2] - 2026-10-26 （插件预览版，未发 Release）
+
+插件（`extension/`，Manifest V3，零构建步骤）是 v2 的主实现；Python CLI 冻结在 0.1.3 进维护模式。
+本节与下一节的代码在 `eng/for-63-extension-skeleton` → `eng/for-64-ai-classify` 上，尚未合 main，不发 tag。
+
+### Added
+- **AI 分类（BYOK，FOR-64）**：`extension/classifyLlm.js` 走 OpenAI 兼容端点（DeepSeek / 智谱 / Kimi / 通义 / 自定义 https baseURL，`PROVIDER_PRESETS`）。每批 40 条，强制 JSON schema 输出（`{ref, category, confidence, reason}`，`ref` 是批次内代号）；解析失败重试一次（重试时带 hint 并放宽成 `json_object`），再失败则**该批**降级为离线分类并标 `local_degraded`；429 / 401 不重试打爆额度，直接降级并给中文原因。外发载荷只有昵称（+ 简介与认证文案，可勾掉），mid / 头像 / cookie / 关注关系一律不发。
+- **首次启用 AI 的先告知（FOR-64 验收 3）**：`consentNotice` + `makeConsent` + 侧栏 `<dialog>`，逐条写清发几条、发哪些字段、发到哪个 origin；端点换过或改「只发昵称」都要重新确认；端点 origin 走 `optional_host_permissions` 在用户手势里运行时申请，安装时不预授。API Key 存独立键 `llm_api_key.v1`，配置对象 / meta / 审计 / 导出都不带它（`privacy.js` 会拦）。
+- **离线粗分类（FOR-64 验收 4）**：`extension/classifyLocal.js` 按关键词分档打分（简介 > 昵称，认证文案另计），零网络；UI 标「离线粗分类」。
+- **12 类可编辑体系（FOR-64 验收 1）**：`extension/taxonomy.js` 预置 12 类 +「其他」兜底 +「待确认」低置信桶（阈值 0.55）；类有稳定 id，改名不产生孤儿结果；自定义类可加关键词，「其他」「待确认」删不掉。
+- **分类编排、落库与 UI（FOR-64 验收 5/6）**：`extension/classify.js` 的 `runClassification` 先过 `classificationGate`（没读全直接抛 `ClassificationLockedError`，文案就是「还没读全（已取 431/812）」），结果按 100 条分块落 `chrome.storage.local`，meta 记门禁快照 / 来源 / 批次数 / 降级批数；侧栏类别卡片显示数量、占比、平均置信与来源，并有「保留 / 进候选」；低置信一律进「待确认」且保留 `rawCategory` 可追溯。
+- `PRIVACY.md`：把 v1 的「数据完全不出本机」正面改写成「凭据永不出本机；昵称与简介只发给你自己指定的模型端点」，逐条列出永远不出本机的数据与唯一的出网路径。
+- 测试：扩展离线单测 36 → 84 项（`classify_gate` / `classify_llm` / `classify_local` / `classify_ui` / `taxonomy_edit` / `import_graph`），另加 4 项「真形状夹具 × 可控 mock LLM」的端到端断言（`classify_llm_fixture`，共 88 项）；`tests/test_release_hygiene.py` 新增 PRIVACY.md 口径门禁（pytest 247 → 248）。
+
+### Changed
+- README / README_en.md 顶部口径从「数据全程留在本机」改成「凭据永不出本机 + 只有你指定的端点收得到昵称与简介」，并指向 PRIVACY.md。
+
+## [2.0.0-alpha.1] - 2026-10-25 （插件预览版，未发 Release）
+
+### Added
+- **扩展骨架（FOR-63）**：`extension/`（MV3 + Side Panel + service worker），登录态分页抓全关注列表；`fetched == total` 是硬门禁（没读全时「开始分类」disabled），三级降级（SW fetch → B站页面内 fetch → 关注页 DOM 翻页），中断保留数据标 `incomplete` 并可续抓；`report.md` / `report.csv`（BOM）/ `to-unfollow.txt` 与 CLI 常量交叉比对；`extension/privacy.js` 在写盘、导出、打日志前剥凭据字段并对凭据形态拒写。
 ## [0.1.3] - 2026-10-25
 
 ### Fixed
