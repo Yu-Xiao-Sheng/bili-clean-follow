@@ -18,6 +18,9 @@ from bili import __version__ as BILI_VERSION  # noqa: E402
 REPO_ROOT = SRC.parent
 DOCS = ("README.md", "README_en.md", "docs/getting-started.md")
 ZIP_LINK = re.compile(r"releases/download/v([^/]+)/bili-clean-follow-([^/]+)\.zip")
+RELEASE_ASSET_LINK = re.compile(r"releases/download/v([^/]+)/([^)\s]+)")  # zip 与 mp4 同一口径
+FILM_LINK = re.compile(r"releases/download/v([^/]+)/(bili-clean-(?:promo|walkthrough)\.mp4)")
+FILM_FILES = ("bili-clean-promo.mp4", "bili-clean-walkthrough.mp4")
 
 
 def _read(rel):
@@ -49,6 +52,38 @@ def test_every_doc_links_only_the_current_release_zip():
         stale = sorted({tag for tag, pkg in found if tag != BILI_VERSION or pkg != BILI_VERSION})
         assert not stale, "%s still links v%s while the package is %s" % (
             rel, ",".join(stale), BILI_VERSION)
+
+
+def test_readmes_link_both_release_films_of_the_current_version():
+    """首屏那两支宣传片的链接必须在，而且必须挂在当前版本名下（FOR-61）。
+
+    FOR-34 的 swap 已把 v0.1.2 名下那两支 mp4 摘走（v0.1.2 现在只剩 zip），
+    换成通过验收的那一版挂到 v0.1.3。README 若还写 v0.1.2 的 mp4 链接，读者从
+    第一屏点进去就是 404；这种断层在登录状态下也不会给出可读提示，只能由测试钉住。
+    """
+    for rel in ("README.md", "README_en.md"):
+        found = FILM_LINK.findall(_read(rel))
+        names = sorted(name for _, name in found)
+        assert names == sorted(FILM_FILES), (
+            "%s must link exactly the two release films (%s), got: %s"
+            % (rel, " + ".join(FILM_FILES), ", ".join(names) or "<none>"))
+        stale = sorted({tag for tag, _ in found if tag != BILI_VERSION})
+        assert not stale, (
+            "%s links the films under v%s, but those assets were removed from the "
+            "release; the films now live under v%s"
+            % (rel, ", ".join(stale), BILI_VERSION))
+
+
+def test_no_doc_links_a_release_asset_from_another_version():
+    """Release 链接只有一个版本：zip 与 mp4 走同一口径（FOR-61 把 mp4 纳入）。"""
+    for rel in DOCS:
+        found = RELEASE_ASSET_LINK.findall(_read(rel))
+        assert found, "%s has no release asset link at all" % rel
+        stale = sorted({tag for tag, _ in found if tag != BILI_VERSION})
+        assert not stale, (
+            "%s still links v%s release assets (%s) while the package is %s"
+            % (rel, ", ".join(stale),
+               ", ".join(sorted({name for _, name in found})), BILI_VERSION))
 
 
 def test_every_doc_states_the_current_cli_version():

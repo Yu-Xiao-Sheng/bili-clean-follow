@@ -4,7 +4,7 @@
 
 一个开源工具：分析你的 B站关注列表，把每个关注按 **keep / review / remove** 分类，并给出可解释的原因——让你有把握地清理掉过期、不活跃或低价值关注。
 
-> 🎬 **两支 60 秒的片子**（1080p，带音轨）：[产品介绍片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4) · [使用教程片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+> 🎬 **两支 60 秒的片子**（1080p，带音轨）：[产品介绍片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.3/bili-clean-promo.mp4) · [使用教程片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.3/bili-clean-walkthrough.mp4)
 
 ## 为什么需要
 
@@ -34,7 +34,7 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，247 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，249 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**

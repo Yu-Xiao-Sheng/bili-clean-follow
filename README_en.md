@@ -6,7 +6,7 @@ An open-source tool that analyzes your Bilibili follow list and classifies each
 follow into **keep / review / remove** with explainable reasons — so you can
 clean up stale, inactive, or low-value follows with confidence.
 
-> 🎬 **Two ~60-second films** (1080p, with audio): [product intro](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4) · [walkthrough](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+> 🎬 **Two ~60-second films** (1080p, with audio): [product intro](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.3/bili-clean-promo.mp4) · [walkthrough](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.3/bili-clean-walkthrough.mp4)
 
 ## Why
 You may have a few hundred (or thousand) Bilibili follows, many of which you
@@ -33,7 +33,7 @@ to unfollow.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 247 tests green).
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 249 tests green).
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 

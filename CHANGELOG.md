@@ -13,15 +13,17 @@ Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 - 内嵌进 JSON `<script>` 元素的昵称只把 `</script>` 写成 `<\/script>`，但 HTML 解析器认标签不认大小写：昵称里的 `</SCRIPT>` 会提前关掉 script 元素、整页表格塌掉（实测连内嵌 JSON 都解析不出来）（FOR-58）。现在把 `<` 统一写成反斜杠-u003c
 - `tools/probe_web_render.py` 在 Windows 中文控制台假红（FOR-59）：`PYTHONIOENCODING=gbk` + `PYTHONUTF8=0` 下跑这条门禁，渲染层断言其实全部通过，但 `print_report` 打含 emoji 的昵称时炸出 `UnicodeEncodeError: 'gbk' codec can't encode character '\U0001f600'`、进程 exit=1；本地复核会被误导，而 CI 只跑 ubuntu 抓不到这个环境。入口与 `print_report` 现在都走 `bili.streams.harden_stdio()`（与 CLI / Web / demo 同一份兜底，沿用 FOR-38 已定型的口径，不留第二份实现）
 
+- README.md / README_en.md 首屏那两支宣传片链接挂的是 `releases/download/v0.1.2/bili-clean-promo.mp4` 与 `.../bili-clean-walkthrough.mp4`，但 FOR-34 的 swap 已把这两支 mp4 从 v0.1.2 摘走、改挂到 v0.1.3（v0.1.2 名下现在只剩 zip 附件），读者从仓库第一屏点进去必 404，登录状态下也不会变成可读提示（FOR-61）。两条链接改指 v0.1.3 名下通过验收的那一版：`bili-clean-promo.mp4` 7,349,505 B、`bili-clean-walkthrough.mp4` 6,794,692 B
 ### Changed
 - Web 表头排序修掉死字段（FOR-58）：比较器读的是从来没赋值的 `sort`（`state` 只有 `{cls,key,dir}`），所以「得分」「最近活跃(天)」「最新视频(天)」永远按字典序——100 排在 20 前面，`COLS` 里的 `sort:'num'` 是死字段。排序类型现在只从 `COLS` 查（`sortKind`），数值列按数值排、非数字脏数据退回字典序；表头加 ↑/↓ 与 `aria-sort` 指示，并新增 `/?sort=<key>&dir=<asc|desc>` 预置排序（既是深链，也让 `--dump-dom` 的渲染层取证能钉住排序：headless 不会点表头）
-- README.md / README_en.md 测试条数口径 230 → 233 → 244 → 247，由 `tests/test_release_hygiene.py` 钉死：README 写的条数与 `pytest --collect-only` 实际收集数不一致时 CI 直接红
+- README.md / README_en.md 测试条数口径 230 → 233 → 244 → 247 → 249，由 `tests/test_release_hygiene.py` 钉死：README 写的条数与 `pytest --collect-only` 实际收集数不一致时 CI 直接红
 
 ### Added
 - 真实 chromium 渲染层断言进 CI（FOR-57）：`tools/probe_web_render.py` 起 `python -m bili.web` + headless chromium `--dump-dom`，对渲染后的 `<tbody>` 断言（真实导出夹具 + 「昵称像数字 / 含 HTML / 为空」的对抗夹具），命令行可直接跑、也供测试复用；`tests/test_web_render.py` 把这套断言收进 pytest（本机无 chromium 时跳过）；`.github/workflows/ci.yml` 新增 web-render job（playwright chromium + `BILI_REQUIRE_BROWSER=1`），浏览器装不上就红，门禁不会悄悄空跑
 - 排序取证（FOR-58）：`tools/probe_web_render.py` 的数值跨度夹具 + `check_sort` 单调性断言（`3.14 < 20 < 100`、换一列排行序必须跟着那一列走、空值永远垫底）——字典序的坏法在单调性上立刻露馅，不必复刻 JS 比较器
 - `tests/test_probe_console.py`（FOR-59）：不需要浏览器的输出编码钉——在 `PYTHONIOENCODING=gbk`（换 `cp936` 再钉一次）+ `PYTHONUTF8=0` 下调用 `print_report` 不得抛 `UnicodeEncodeError`、退出码必须 0，并 pin 住入口与 `print_report` 两处 `harden_stdio()`
 
+- `tests/test_release_hygiene.py` 把 Release 附件链接纳入发布自检口径（FOR-61）：`test_readmes_link_both_release_films_of_the_current_version()` 钉两版 README 必须各自挂满两支片子（`bili-clean-promo.mp4` + `bili-clean-walkthrough.mp4`，少一条、多一条都算红）且 asset 挂在当前版本名下；`test_no_doc_links_a_release_asset_from_another_version()` 把 zip 与 mp4 收成同一条口径 —— README.md / README_en.md / docs/getting-started.md 里任何 `releases/download/<tag>/<asset>`，只要 tag 不等于当前版本就红。本轮阴性对照：README 改之前这两条各自红（`still links v0.1.2 release assets`），改完全绿
 ## [0.1.2] - 2026-10-24
 
 ### Changed
