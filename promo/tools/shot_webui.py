@@ -22,8 +22,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]          # promo/
 REPO_ROOT = ROOT.parent
-sys.path.insert(0, str(REPO_ROOT / "src"))            # ??????????
+sys.path.insert(0, str(REPO_ROOT / "src"))            # 钉住当前工作树的 src/bili
 from bili import web as bili_web                     # noqa: E402
+
+import bili as _bili                                     # noqa: E402
+from bili import __version__ as BILI_VERSION             # noqa: E402
+_BILI_PATH = Path(_bili.__file__).resolve()
+if _BILI_PATH.parent.parent != (REPO_ROOT / "src").resolve():
+    sys.exit(
+        f"bili 来源不在当前工作树: {_BILI_PATH}"
+        f"（期望 {REPO_ROOT / 'src'}）—— venv 里的 editable install 指向别的 checkout 时，"
+        "截出来的界面不是当前分支的界面"
+    )
 REPO = ROOT.parent                                   # 仓库根
 PUBLIC = ROOT / "public"
 OUT = PUBLIC / "webui.png"
@@ -179,16 +189,16 @@ def main() -> int:
         try:
             results = bili_web.load_report(str(payload))
         except Exception as exc:                       # noqa: BLE001
-            sys.exit(f"?????????????: {exc}")
+            sys.exit(f"报告数据加载失败: {exc}")
         problems = check_dom(dom, results)
         if problems:
-            print(f"[FAIL] ?? src/bili ? Web ?????????????????")
+            print("[FAIL] 当前 src/bili 的 Web 界面在真实浏览器里不可读，不出图")
             for item in problems:
                 print("  - " + item)
-            print("??????? FOR-57????????"
-                  "?????? Web ???????????????")
+            print("先确认 FOR-57 / FOR-58 的渲染层修复已合进当前分支，"
+                  "再重截这张 Web 界面镜头。")
             raise SystemExit(3)
-        print(f"[OK] DOM ???????{len(results)} ?????? NaN??? span ???")
+        print(f"[OK] DOM 门禁通过：{len(results)} 行渲染完整，无 NaN、无塌行（bili {BILI_VERSION}）")
         subprocess.run([browser, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                         "--force-device-scale-factor=1", f"--window-size={args.size}",
                         "--virtual-time-budget=4000", f"--screenshot={OUT}",
