@@ -47,3 +47,41 @@ button.ghost { background: transparent; }
 
 .audit { margin: 8px 0 0; padding-left: 18px; font-size: 11px; color: var(--muted); line-height: 1.7; }
 .audit li { word-break: break-word; }
+
+
+/* --- FOR-64：BYOK 配置、分类卡片、体系编辑、外发告知弹窗 --- */
+.field { display: block; margin: 8px 0; }
+.field-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.field input, .field select, .tax input, .tax-add input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 12px;
+  background: #0f131b; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px;
+}
+.check { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); margin: 8px 0; }
+.check input { width: auto; }
+
+.cats { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.cat { border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; background: #101521; }
+.cat.keep { border-color: var(--ok); }
+.cat.candidate { border-color: var(--accent); }
+.cat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cat-name { font-size: 13px; font-weight: 600; }
+.cat-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cat-bar { height: 4px; background: #0a0c11; border-radius: 999px; overflow: hidden; margin: 7px 0 6px; }
+.cat-bar > div { height: 100%; background: var(--accent); }
+.cat-meta { font-size: 11px; color: var(--muted); }
+.cat-actions { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+.cat-actions button { font-size: 11px; padding: 5px 9px; }
+.cat-actions button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #14100f; }
+.cat-samples { margin: 7px 0 0; padding-left: 16px; font-size: 11px; color: var(--muted); line-height: 1.7; }
+.cat-samples li { word-break: break-word; }
+
+.tax { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.tax li { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 6px; align-items: center; }
+.tax li button { font-size: 11px; padding: 5px 8px; }
+.tax-add { display: flex; gap: 6px; margin-top: 8px; }
+.tax-add input { flex: 1; }
+
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); padding: 16px; width: 92%; }
+dialog::backdrop { background: rgba(6, 8, 12, .72); }
+dialog h2 { margin: 0 0 10px; font-size: 15px; }
+.consent { margin: 0 0 10px; padding-left: 18px; font-size: 12px; line-height: 1.7; }

@@ -7,8 +7,8 @@
 </head>
 <body>
   <header>
-    <h1 class="brand">Bili Clean Follow <span class="tag">v2 预览 · 只读</span></h1>
-    <p class="lede">先读全，再分类。这一步只抓关注列表 + 出本地报告，不分类、不取关。</p>
+    <h1 class="brand">Bili Clean Follow <span class="tag">v2 预览 · 只读 + 分类</span></h1>
+    <p class="lede">先读全，再分类。这一版能抓全关注列表 + 离线/AI 分类 + 只读导出；仍然不会取关任何 UP 主。</p>
   </header>
 
   <section class="card">
@@ -38,8 +38,52 @@
       <span class="label">下一步</span>
       <span id="classify-lock" class="lock"></span>
     </div>
-    <button id="btn-classify" class="primary" disabled>开始分类</button>
-    <p class="foot">读全（fetched == total）之后才解锁分类。抓到的数据会保留，中断后点「继续抓取」。</p>
+    <div class="export-row">
+      <button id="btn-classify" class="primary" disabled>开始分类</button>
+      <button id="btn-classify-local" class="ghost" disabled>只用离线规则分类</button>
+      <button id="btn-classify-stop" class="ghost" hidden>停止分类</button>
+    </div>
+    <div id="classify-line" class="state-line">读全（fetched == total）之后才解锁分类。抓到的数据会保留，中断后点「继续抓取」。</div>
+  </section>
+
+  <section class="card">
+    <span class="label">AI 分类（BYOK：你自己的模型端点，可跳过）</span>
+    <div class="field">
+      <span class="field-label">预设</span>
+      <select id="llm-preset"></select>
+    </div>
+    <label class="field"><span class="field-label">baseURL</span><input id="llm-baseurl" type="url" placeholder="https://api.deepseek.com/v1"></label>
+    <label class="field"><span class="field-label">模型名</span><input id="llm-model" type="text" placeholder="deepseek-chat"></label>
+    <label class="field"><span class="field-label">API Key</span><input id="llm-key" type="password" autocomplete="off" placeholder="只存本机浏览器扩展存储"></label>
+    <label class="check"><input id="llm-sendbio" type="checkbox" checked><span>发送简介（取消勾选则只发昵称）</span></label>
+    <div class="export-row">
+      <button id="btn-llm-save" class="ghost">保存配置</button>
+      <button id="btn-llm-clearkey" class="ghost">清除 Key</button>
+      <button id="btn-llm-clearconsent" class="ghost">撤回外发确认</button>
+    </div>
+    <div id="llm-line" class="hint">没填 Key：只用离线规则分类，零外发。</div>
+    <p class="foot">凭据永不出本机；昵称与简介只发给你自己指定的模型端点。不含 Cookie / UID / mid / 头像 / 关注关系。</p>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">分类结果</span>
+      <span id="classify-source" class="tag"></span>
+    </div>
+    <div id="classify-summary" class="state-line">还没分类。</div>
+    <ul id="category-list" class="cats"></ul>
+    <p class="foot">「保留」= 这类 UP 主永不进入取关候选；「进候选」= 交给后续取关流程（本版不会自动取关）。低置信（&lt; 0.55）一律进「待确认」，不硬塞。</p>
+  </section>
+
+  <section class="card">
+    <span class="label">分类体系（12 类预置，可增删改名）</span>
+    <ul id="taxonomy-list" class="tax"></ul>
+    <div class="tax-add">
+      <input id="tax-new-name" type="text" placeholder="新类别名，如 手工DIY">
+      <input id="tax-new-keywords" type="text" placeholder="关键词，逗号分隔">
+      <button id="btn-tax-add" class="ghost">添加</button>
+    </div>
+    <div id="tax-line" class="hint"></div>
   </section>
 
   <section class="card">
@@ -56,6 +100,17 @@
     <span class="label">审计（最近事件）</span>
     <ul id="audit-list" class="audit"></ul>
   </section>
+
+  <dialog id="consent-dialog">
+    <h2 id="consent-title">启用 AI 分类前请先确认</h2>
+    <ul id="consent-lines" class="consent"></ul>
+    <label class="check"><input id="consent-sendbio" type="checkbox" checked><span>发送简介（取消勾选则只发昵称）</span></label>
+    <div class="export-row">
+      <button id="consent-accept" class="primary">我已确认，开始 AI 分类</button>
+      <button id="consent-cancel" class="ghost">取消</button>
+    </div>
+    <p class="foot" id="consent-privacy"></p>
+  </dialog>
 
   <script type="module" src="sidepanel.js"></script>
 </body>

@@ -34,7 +34,7 @@ bili-clean-follow 是「本地、透明、只报告」的 B站关注清理工具
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，247 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，248 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
@@ -99,14 +99,14 @@ python -m bili.web --input sample-follows.json
 
 ## 插件预览版怎么装（v2 进行中）
 
-> ⚠️ v2 还在开发：插件目前只做「读全关注列表 + 本地只读报告」，还没有 AI 分类、自然语言指令和取关能力（后续工单 FOR-64 / FOR-65）。想现在就用完整功能，走上面的 CLI「快速开始」——按 v2 方案，CLI 已进维护模式（只修安全问题，不再加功能）。
+> ⚠️ v2 还在开发：插件现在已经能做「读全关注列表 + 分类（离线规则 / 你自带 Key 的模型）+ 本地只读报告」；还没有自然语言指令与取关能力（后续工单 FOR-65）。想现在就用打分式分析，走上面的 CLI「快速开始」——按 v2 方案，CLI 已进维护模式（只修安全问题，不再加功能）。
 
 四步装好，全程不用 clone、不用 pip、不用 npm：
 
 1. 拿到 `extension/` 目录：正式发布后从 Releases 下载 `bili-clean-follow-v2.0.0-extension.zip` 解压；预览阶段直接克隆仓库取其中的 `extension/`。
 2. 把它放在一个固定目录（Chrome 只记路径，目录被删插件就失效）。
 3. 打开 `chrome://extensions` → 右上角开「开发者模式」→「加载已解压的扩展程序」→ 选中 `extension/` 目录本身。
-4. 先在浏览器里登录 bilibili.com，再点工具栏图标 →「分析我的关注列表」，Side Panel 里看进度（已取 / total / 页数）。
+4. 先在浏览器里登录 bilibili.com，再点工具栏图标 →「分析我的关注列表」，Side Panel 里看进度（已取 / total / 页数）。读全之后点「开始分类」：没填模型 Key 就自动走离线规则，零外发。读全之后点「开始分类」（没填模型 Key 就自动走离线规则，零外发）。
 
 它会做什么、不会做什么：
 
@@ -114,9 +114,13 @@ python -m bili.web --input sample-follows.json
 - **读全才解锁下一步**：抓取循环一直翻到 `fetched == total`；没读全时「开始分类」是灰的，旁边写着「还没读全（已取 431/812）」。中断不丢数据（状态标 incomplete），点「继续抓取」从断点页继续。
 - **接口不可用会降级**：service worker fetch → B站页面内 fetch → 关注页 DOM 翻页兜底，三条路都必须翻到最后一页。
 - **导出与 CLI 同一口径**：`report.md`、`report.csv`（带 UTF-8 BOM，Excel/WPS 双击不乱码）、`to-unfollow.txt`（每行 `mid <TAB> 昵称` 的人工核对清单）。
-- **凭据不出本机**：Cookie 与 Key 不进仓库、不进日志、不进导出文件；插件不联网到任何第三方服务（BYOK 的 AI 分类是后续工单，启用前会先告知发送哪些字段、发到哪个端点）。
+- **分类：12 类预置，可增删改名**：科技数码 / 游戏电竞 / 影视综艺 / 知识教育 / 美食 / 生活日常 / 搞笑段子 / 音乐 / 动漫二次元 / 体育 / 时尚美妆 / 资讯时事，外加「其他」兜底。类别卡片显示条数、占比、平均置信，并有「保留 / 进候选」；选了「保留」的类永不进入取关候选。
+- **两条分类路径**：默认**离线规则**（昵称 + 简介 + 官方认证 + 关注时间，零网络请求，置信度封顶 0.68）；填了自己的端点与 Key 才走 **AI 分类**（OpenAI 兼容：DeepSeek / 智谱 / Kimi / 通义 / 本机 Ollama / 自定义 baseURL），每批 40 条、强制 JSON schema、解析失败重试一次后该批降级为离线。
+- **低置信不硬塞**：置信 < 0.55 一律进「待确认」，并保留「本来像哪一类」的留痕。
+- **外发先告知**：首次启用 AI 会逐条列出「将发送 N 条昵称 + 简介到 <你填的端点>」，可改成只发昵称；载荷里没有 Cookie / UID / mid / 头像 / 关注关系，只带一次性代号 r1、r2…；换端点必须重新确认，随时可「撤回外发确认」。安装时不预授第三方权限，确认端点时才申请那一个 origin。
+- **凭据不出本机**：Cookie 与 Key 不进仓库、不进日志、不进导出文件（Key 只待在 `chrome.storage.local` 的独立键里）；没有我们的服务器，也没有遥测中转。完整口径见 [PRIVACY.md](PRIVACY.md)。
 
-图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（36 项 node:test 用例，CI 已钉成门禁）。
+图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（84 项 node:test 用例，CI 已钉成门禁）。
 
 
 ## 如何得分
@@ -137,9 +141,12 @@ python -m bili.web --input sample-follows.json
 ```
 src/bili/        # 包：model, loaders, score, export, cli, demo（v2 起进维护模式）
 extension/       # v2 Chrome 插件：Manifest V3 + 原生 ESM，零构建步骤（Load unpacked 直接用）
+                 #   biliApi / store / report + taxonomy(12类) + classifyLocal(离线) + classifyLlm(BYOK) + classify(门禁与落库)
 tests/extension/ # 扩展离线单测（node:test，无需浏览器）
 tests/           # pytest 测试套件
-docs/            # spec.md, getting-started.md, scoring-model.md
+docs/            # spec.md, getting-started.md, scoring-model.md, extension-install.md
+PRIVACY.md       # v2 隐私口径：凭据永不出本机；昵称与简介只发给你自己指定的模型端点, extension-install.md
+PRIVACY.md       # v2 隐私口径：凭据永不出本机；昵称与简介只发给你自己指定的模型端点
 .github/         # CI 工作流 + Issue/Discussion 模板
 pyproject.toml
 ```

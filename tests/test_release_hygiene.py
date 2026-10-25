@@ -73,6 +73,17 @@ def test_stated_test_count_matches_the_real_suite():
             % (rel, match.group(1), collected))
 
 
+def test_privacy_md_states_the_v2_data_flow():
+    """FOR-64：v2 引入 BYOK 之后，"数据不出本机"必须被改写成可核对的口径，
+    而且要钉在测试里——口号漂移过一次就已经出过事故了。"""
+    text = _read("PRIVACY.md")
+    assert "凭据永不出本机" in text, "PRIVACY.md 没有写住凭据边界"
+    assert "只发给你自己指定的模型端点" in text, "PRIVACY.md 没有说清外发目的地是用户自己的端点"
+    for never_sent in ["Cookie", "mid", "头像", "关注关系"]:
+        assert never_sent in text, "PRIVACY.md 要逐条列出外发不含 " + never_sent
+    assert "chrome.storage.local" in text, "Key 的存放位置要写清"
+
+
 def _collected_count():
     env = dict(os.environ, PYTHONPATH=str(SRC))
     out = subprocess.run(
