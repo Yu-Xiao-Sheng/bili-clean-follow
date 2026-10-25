@@ -11,6 +11,7 @@ Accept: application/vnd.github.html，取证见 docs/video-hosting.md）证明 G
 README 第一屏内联 GIF（<= 8 MB）、存在点开即播的入口（Pages / B站 / YouTube）、
 mp4 绝不进 main 的 git 历史。少任何一条都会退回"用户只能下载"的老问题，所以全部钉成门禁。
 """
+import json
 import os
 import re
 import shutil
@@ -205,3 +206,55 @@ def test_no_video_binaries_are_committed():
     assert not bad, (
         "仓库里提交了视频二进制：%s —— 会永久留在 main 历史里。"
         "影片走 Release（Pages 由 tools/publish_pages.py 组装，产物在 dist/）" % ", ".join(bad))
+
+# --- FOR-67：交付树卫生 + 测试报告的机器可读契约 ------------------------------
+# 「解压即用 / 零构建」是 v2 的卖点：node_modules 一旦进 git，zip 体积与
+# 「无 npm install」的口径同时失控。FOR-63 只在 extension/ 里禁依赖，
+# FOR-67 把它扩到整棵树（Pages 与后续影片工程的依赖目录同样不许提交）。
+DEP_DIR_SEGMENTS = ("node_modules/", ".pnpm-store/", "site-packages/")
+
+
+def test_no_dependency_directories_are_committed():
+    """FOR-67 CI 门禁：整棵树不得提交依赖目录（无 node_modules 提交检查）。"""
+    offenders = sorted(
+        p for p in _tracked_files()
+        if any(seg in "/" + p.replace("\\", "/") for seg in DEP_DIR_SEGMENTS)
+    )
+    assert not offenders, (
+        "仓库里提交了依赖目录：%s —— 「Load unpacked 直接可用」随之失效，"
+        "zip 体积也会失控。依赖只能装在仓库外，或写进 .gitignore。" % ", ".join(offenders))
+
+
+QA_REPORT_MD = "docs/qa-report-v2.md"
+QA_REPORT_JSON = "docs/qa-report-v2.json"
+# FOR-70 的两支片子从这份 JSON 注入片内数字：字段名一改，渲染静默拿到假数。
+QA_JSON_FIELDS = ("follow_total", "pages", "cls", "diff", "unfollow")
+QA_TRACK_LABELS = ("mock", "real", "offline")
+
+
+def test_qa_report_v2_ships_a_machine_readable_sibling():
+    """三轨报告落地时，机器可读版必须同时在位且字段齐（FOR-67 产出 3）。"""
+    md = REPO_ROOT / QA_REPORT_MD
+    if not md.exists():
+        import pytest
+        pytest.skip("%s 尚未产出：FOR-67 三轨取证跑完才落盘" % QA_REPORT_MD)
+    js = REPO_ROOT / QA_REPORT_JSON
+    assert js.exists(), (
+        "%s 已存在但 %s 缺失：FOR-70 拿不到片内数字，两支片子渲不出来"
+        % (QA_REPORT_MD, QA_REPORT_JSON))
+    data = json.loads(js.read_text(encoding="utf-8"))
+    for field in QA_JSON_FIELDS:
+        assert field in data, "%s 缺字段 %s" % (QA_REPORT_JSON, field)
+    counts = data["cls"]["counts"]
+    assert isinstance(counts, dict) and counts, "cls.counts 必须是 类目 -> 条数 的映射"
+    assert sum(counts.values()) == data["follow_total"], (
+        "分类条目数 %d 与关注条目数 %s 不等（验收清单 B5）"
+        % (sum(counts.values()), data["follow_total"]))
+    assert data["diff"]["n"] >= data["unfollow"]["done"] >= 0, (
+        "实际执行数不能超过 diff 预览条数（验收清单 D2）")
+    assert data["unfollow"]["done"] <= 50, (
+        "单次执行上限 50（验收清单 D3），报告里写的是 %s" % data["unfollow"]["done"])
+    tracks = data.get("tracks", {})
+    for track in ("A", "B", "C"):
+        assert tracks.get(track) in QA_TRACK_LABELS, (
+            "%s 轨必须标 mock / real / offline（报告不得把 mock 写成真实会话）" % track)
