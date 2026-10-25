@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Bili Clean Follow · 侧栏</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header>
+    <h1 class="brand">Bili Clean Follow <span class="tag">v2 预览 · 只读</span></h1>
+    <p class="lede">先读全，再分类。这一步只抓关注列表 + 出本地报告，不分类、不取关。</p>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">抓取进度</span>
+      <span id="status-pill" class="pill idle">未开始</span>
+    </div>
+    <div class="progress"><div id="progress-bar" class="bar"></div></div>
+    <div class="stats">
+      <div><span id="stat-fetched" class="num">0</span><span class="unit">已取</span></div>
+      <div><span id="stat-total" class="num">-</span><span class="unit">关注数 total</span></div>
+      <div><span id="stat-pages" class="num">0</span><span class="unit">页数</span></div>
+    </div>
+    <div id="progress-line" class="state-line">还没开始抓取。</div>
+    <div id="hint-line" class="hint"></div>
+  </section>
+
+  <section class="card actions">
+    <button id="btn-start" class="primary">读全我的关注列表</button>
+    <button id="btn-resume" class="ghost" hidden>继续抓取</button>
+    <button id="btn-stop" class="ghost" hidden>停止</button>
+    <button id="btn-login" class="ghost">检查登录态</button>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">下一步</span>
+      <span id="classify-lock" class="lock"></span>
+    </div>
+    <button id="btn-classify" class="primary" disabled>开始分类</button>
+    <p class="foot">读全（fetched == total）之后才解锁分类。抓到的数据会保留，中断后点「继续抓取」。</p>
+  </section>
+
+  <section class="card">
+    <span class="label">只读导出</span>
+    <div class="export-row">
+      <button id="btn-export-md" class="ghost" disabled>Markdown</button>
+      <button id="btn-export-csv" class="ghost" disabled>CSV（带 BOM）</button>
+      <button id="btn-export-unfollow" class="ghost" disabled>取关候选清单</button>
+    </div>
+    <p class="foot">导出文件里没有 Cookie、没有 Key。清单只用于人工核对，工具不会自动取关。</p>
+  </section>
+
+  <section class="card">
+    <span class="label">审计（最近事件）</span>
+    <ul id="audit-list" class="audit"></ul>
+  </section>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>

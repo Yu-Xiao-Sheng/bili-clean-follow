@@ -1,0 +1,49 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d0f14;
+  --card: #151923;
+  --line: #232a38;
+  --ink: #eef1f6;
+  --muted: #97a1b3;
+  --accent: #fb7299;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+
+body { margin: 0; padding: 16px 16px 28px; background: var(--bg); color: var(--ink); }
+h1.brand { margin: 0 0 4px; font-size: 17px; letter-spacing: .01em; }
+.tag { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 7px; vertical-align: middle; }
+.lede { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; margin-bottom: 12px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.label { font-size: 12px; color: var(--muted); }
+.foot { margin: 8px 0 0; font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+.progress { height: 6px; background: #0a0c11; border-radius: 999px; overflow: hidden; margin: 10px 0; }
+.bar { height: 100%; width: 0; background: var(--accent); transition: width .3s ease; }
+
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
+.stats > div { display: flex; flex-direction: column; }
+.num { font-size: 20px; font-variant-numeric: tabular-nums; }
+.unit { font-size: 11px; color: var(--muted); }
+
+.pill { font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.scanning { color: var(--warn); border-color: var(--warn); }
+.pill.complete { color: var(--ok); border-color: var(--ok); }
+.pill.incomplete { color: var(--accent); border-color: var(--accent); }
+
+.state-line { font-size: 13px; margin: 4px 0 0; }
+.hint { font-size: 12px; color: var(--warn); margin-top: 6px; line-height: 1.6; }
+.lock { font-size: 12px; color: var(--accent); }
+
+button { font: inherit; border-radius: 8px; padding: 8px 12px; border: 1px solid var(--line); background: #1b2130; color: var(--ink); cursor: pointer; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #14100f; font-weight: 600; }
+button.ghost { background: transparent; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.export-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+.audit { margin: 8px 0 0; padding-left: 18px; font-size: 11px; color: var(--muted); line-height: 1.7; }
+.audit li { word-break: break-word; }

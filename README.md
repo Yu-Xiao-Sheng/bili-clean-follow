@@ -97,6 +97,28 @@ python -m bili.web --input sample-follows.json
 
 打开 http://127.0.0.1:8787 （只监听 127.0.0.1，只读；页面顶部显示 `bili-clean-follow v0.1.3 · 本地只读 · 数据不出本机`）。
 
+## 插件预览版怎么装（v2 进行中）
+
+> ⚠️ v2 还在开发：插件目前只做「读全关注列表 + 本地只读报告」，还没有 AI 分类、自然语言指令和取关能力（后续工单 FOR-64 / FOR-65）。想现在就用完整功能，走上面的 CLI「快速开始」——按 v2 方案，CLI 已进维护模式（只修安全问题，不再加功能）。
+
+四步装好，全程不用 clone、不用 pip、不用 npm：
+
+1. 拿到 `extension/` 目录：正式发布后从 Releases 下载 `bili-clean-follow-v2.0.0-extension.zip` 解压；预览阶段直接克隆仓库取其中的 `extension/`。
+2. 把它放在一个固定目录（Chrome 只记路径，目录被删插件就失效）。
+3. 打开 `chrome://extensions` → 右上角开「开发者模式」→「加载已解压的扩展程序」→ 选中 `extension/` 目录本身。
+4. 先在浏览器里登录 bilibili.com，再点工具栏图标 →「分析我的关注列表」，Side Panel 里看进度（已取 / total / 页数）。
+
+它会做什么、不会做什么：
+
+- **只读**：只调 `x/web-interface/nav`（取自己的 mid）与 `x/relation/followings`（抓关注列表），不调任何取关接口。
+- **读全才解锁下一步**：抓取循环一直翻到 `fetched == total`；没读全时「开始分类」是灰的，旁边写着「还没读全（已取 431/812）」。中断不丢数据（状态标 incomplete），点「继续抓取」从断点页继续。
+- **接口不可用会降级**：service worker fetch → B站页面内 fetch → 关注页 DOM 翻页兜底，三条路都必须翻到最后一页。
+- **导出与 CLI 同一口径**：`report.md`、`report.csv`（带 UTF-8 BOM，Excel/WPS 双击不乱码）、`to-unfollow.txt`（每行 `mid <TAB> 昵称` 的人工核对清单）。
+- **凭据不出本机**：Cookie 与 Key 不进仓库、不进日志、不进导出文件；插件不联网到任何第三方服务（BYOK 的 AI 分类是后续工单，启用前会先告知发送哪些字段、发到哪个端点）。
+
+图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（35 项 node:test 用例，CI 已钉成门禁）。
+
+
 ## 如何得分
 
 三个加权信号（见 [docs/scoring-model.md](docs/scoring-model.md)）：
@@ -113,7 +135,9 @@ python -m bili.web --input sample-follows.json
 ## 项目结构
 
 ```
-src/bili/        # 包：model, loaders, score, export, cli, demo
+src/bili/        # 包：model, loaders, score, export, cli, demo（v2 起进维护模式）
+extension/       # v2 Chrome 插件：Manifest V3 + 原生 ESM，零构建步骤（Load unpacked 直接用）
+tests/extension/ # 扩展离线单测（node:test，无需浏览器）
 tests/           # pytest 测试套件
 docs/            # spec.md, getting-started.md, scoring-model.md
 .github/         # CI 工作流 + Issue/Discussion 模板

@@ -113,3 +113,29 @@ jobs:
         run: |
           python -m pytest -q tests/test_web_render.py
           python tools/probe_web_render.py
+
+  # FOR-63：扩展（Chrome MV3）门禁。这条 job 存在的理由与 smoke-gbk 相同：
+  # 「扩展不需要构建」本身就是会被破坏的属性 - 有人哪天加个 package.json 依赖，
+  # README 里「Load unpacked 直接可用」就变成假话；所以把零构建与离线单测钉成 CI。
+  extension:
+    name: test - extension (MV3, zero build, node:test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Zero-build gate (no dependency manifest, no node_modules)
+        run: |
+          test ! -e extension/package.json
+          test ! -d extension/node_modules
+          test -f extension/manifest.json
+          grep -q '"manifest_version": 3' extension/manifest.json
+          echo "extension/ is dependency-free; Load unpacked works as documented"
+
+      - name: Offline unit tests (no browser, no Bilibili account)
+        run: node --test tests/extension/*.test.mjs

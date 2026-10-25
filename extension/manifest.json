@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Bili Clean Follow（B站关注列表清理 · v2 插件预览版）",
+  "version": "2.0.0-alpha.1",
+  "description": "只读：在你的登录态里抓全 B站关注列表，本地出 Markdown / CSV / 取关候选清单。本预览版不分类、不取关，也不联网到任何第三方服务。",
+  "permissions": ["sidePanel", "storage", "cookies", "scripting"],
+  "host_permissions": [
+    "https://api.bilibili.com/*",
+    "https://www.bilibili.com/*",
+    "https://space.bilibili.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "分析我的关注列表"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://space.bilibili.com/*/relation/follow*"],
+      "js": ["content/followpage.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
