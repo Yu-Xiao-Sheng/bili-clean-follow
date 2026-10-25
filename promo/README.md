@@ -124,4 +124,18 @@ python qa.py out/frames/promo out/frames/walk                           # qa.py 
 ```
 
 qa.py 报 BLANK（ink < 200）或 TOUCHES_EDGE（内容贴到 1080 画布边缘）就退回排版重做。
+
+再往下，`qa.py` 只能证明「这一帧有内容、没出画布」，它证明不了**这一秒在讲什么**。
+上一轮批评是「宣传片只有内容没有项目仓库图像」，这类判断需要肉眼过一遍全片，
+而 reviewer 手边不一定有播放器。`tools/contact_sheet.py` 把逐秒帧拼成一张带秒数和段名的
+缩略图，一张 PNG 看完整支片子；段名与时间轴不是手填的，是从 `src/promo.tsx` /
+`src/walkthrough.tsx` 里的 `const frames` / `const comps` 解析出来的，所以标签不会和实际渲染漂移：
+
+```
+python tools/contact_sheet.py out/frames/promo out/contact-promo.png src/promo.tsx
+python tools/contact_sheet.py out/frames/walk  out/contact-walk.png  src/walkthrough.tsx
+```
+
+顺带一个踩过的坑：抽帧目录会过期。`out/frames/walk` 是上一版（被否的那两支）留下的，
+成片重渲后不重抽，`qa.py` 就是在给旧片出绿灯。重渲之后必须换新的目录名重抽。
 本轮实测（v0.1.3 重渲）：58 + 62 = 120 个抽样帧，0 BLANK、0 TOUCHES_EDGE，最小 ink=917。
