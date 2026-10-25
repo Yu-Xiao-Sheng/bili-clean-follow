@@ -33,7 +33,7 @@ to unfollow.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job; verified locally on 3.13.15, 230 tests green).
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 247 tests green).
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 
@@ -45,7 +45,7 @@ ModuleNotFoundError: No module named 'bili'.
 Option A - install the release zip (no clone needed):
 
 ```
-pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-follow-0.1.2.zip
+pip install https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.3/bili-clean-follow-0.1.3.zip
 ```
 
 Option B - clone, then install:
@@ -56,7 +56,7 @@ cd bili-clean-follow
 pip install -e .
 ```
 
-Sanity check: `bili-clean --version` prints `bili-clean 0.1.2`.
+Sanity check: `bili-clean --version` prints `bili-clean 0.1.3`.
 
 **Step 2 - run the built-in sample**
 
@@ -101,7 +101,7 @@ python -m bili.web --input sample-follows.json
 ```
 
 Open http://127.0.0.1:8787 (bound to 127.0.0.1 only, read-only; the page header shows
-`bili-clean-follow v0.1.2 · 本地只读 · 数据不出本机`).
+`bili-clean-follow v0.1.3 · 本地只读 · 数据不出本机`).
 
 ## Getting a real input
 Bilibili's public follow-list endpoint does not expose per-follow "last active"
@@ -141,7 +141,10 @@ python -m bili.web --input sample-follows.json
 
 Open http://127.0.0.1:8787 to see:
 - summary cards: total follows plus the count and share of keep/review/remove;
-- a filterable (class tabs) and sortable classification table;
+- a filterable (class tabs) and sortable classification table: click a header to sort by that
+  column, click again to flip the direction, the active column shows an up/down caret;
+  得分 / last-seen / last-video sort numerically (20 before 100), and a link can seed the sort,
+  e.g. `http://127.0.0.1:8787/?sort=last_seen_days&dir=asc`;
 - removal-candidate preview: export the unfollow list (.txt) after confirming each item;
 - one-click Markdown / CSV export.
 

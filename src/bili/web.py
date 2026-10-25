@@ -25,8 +25,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from . import __version__
-from .export import (CSV_ENCODING, run, signal_display, signal_warning,
-                     to_csv, to_markdown, to_unfollow_list)
+from .export import (CSV_ENCODING, _html_escape, run, signal_display,
+                     signal_warning, to_csv, to_markdown, to_unfollow_list)
 from .streams import harden_stdio
 from .loaders import SENSITIVE_NAME_RE, load_from_file, refuse_sensitive_path  # noqa: F401
 
@@ -119,6 +119,8 @@ table{width:100%;border-collapse:collapse}
 th,td{border-bottom:1px solid var(--line);padding:9px 8px;text-align:left;word-break:break-word}
 th{color:var(--muted);font-weight:600;cursor:pointer;user-select:none;background:#121a21}
 th:hover{color:var(--text)}
+th[aria-sort]{color:var(--text)}
+.caret{color:var(--muted);margin-left:4px}
 td{vertical-align:top}
 .badge{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600}
 .b-keep{color:var(--keep);border:1px solid var(--keep)}
@@ -208,23 +210,65 @@ PAGE_TAIL = """<section class="remove-panel">
     return (s==null ? '' : String(s)).replace(/&/g,'&amp;')
       .replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   };
-  function fmtNum(v){
-    if(v==null || v===''){ return '\u2014'; }
-    v = Number(v);
-    if(isNaN(v)){ return esc(String(v)); }
-    return Number.isInteger(v) ? String(v) : v.toFixed(1);
+  var PLACEHOLDER = '\u2014';
+  // FOR-57: 文本列（昵称 / 信号 / 粉丝比）走这里，原样转义，绝不过数字格式化。
+  function fmtText(v){
+    if(v==null || v===''){ return PLACEHOLDER; }
+    return esc(String(v));
   }
+  function fmtNum(v){
+    if(v==null || v===''){ return PLACEHOLDER; }
+    var n = Number(v);
+    // FOR-57 根因：旧代码把参数本身改写成了转换后的数字，
+    // 非数字原值（昵称 / 信号名 / "80 / 3000"）走到「转不动」分支时，
+    // 打印出来的已经是那个数字 ⇒ 页面上出现字面量 "NaN"。
+    // 这里保留原值 v，只把转换结果放进 n；转不动就原样转义输出。
+    if(!isFinite(n)){ return esc(String(v)); }
+    if(Number.isInteger(n)){ return String(n); }
+    // 数字列保留精度：3.14 不得截成 3.1（最多两位，去掉浮点噪声）。
+    return String(Math.round(n*100)/100);
+  }
+  // FOR-57: text:1 的列必须走 fmtText；这三列以前落进 fmtNum 的默认分支，
+  // 在真实浏览器里全渲染成 NaN（HTTP 响应体里却完全正常）。
   var COLS = [
-    {key:'nickname', label:'昵称', sort:'str'},
+    {key:'nickname', label:'昵称', sort:'str', text:1},
     {key:'class', label:'分类', sort:'str'},
     {key:'score', label:'得分', sort:'num'},
-    {key:'signals_used', label:'信号', sort:'str'},
+    {key:'signals_used', label:'信号', sort:'str', text:1},
     {key:'last_seen_days', label:'最近活跃(天)', sort:'num'},
     {key:'last_video_days', label:'最新视频(天)', sort:'num'},
-    {key:'ratio', label:'粉丝/关注', sort:'str'},
+    {key:'ratio', label:'粉丝/关注', sort:'str', text:1},
     {key:'reason', label:'原因', sort:'str'},
   ];
   var state = {cls:'all', key:'score', dir:-1};
+
+  // FOR-58 W-5：state 只有 {cls,key,dir}，从来没有 sort 这个字段。
+  // 旧代码比较器读的是 state 上那个从来没赋值的 sort 字段（永远 undefined），
+  // 所以「得分」「最近活跃(天)」「最新视频(天)」点上去永远按字典序 - 100 排在 20 前。
+  // COLS 里的 sort:'num' 从死字段变成唯一真相：排序类型只按列定义查。
+  function sortKind(key){
+    for(var i=0;i<COLS.length;i++){
+      if(COLS[i].key === key){ return COLS[i].sort; }
+    }
+    return 'str';
+  }
+
+  // FOR-58：/?sort=last_seen_days&dir=asc 预置排序列与方向（只读报告的深链）。
+  // 顺带的用处：headless --dump-dom 不会点表头，渲染层测试因此能钉住
+  // 「数值列按数值排序」（20 必须排在 100 前）。
+  (function seedSort(){
+    if(!self.URLSearchParams){ return; }
+    var q = new URLSearchParams(self.location.search);
+    var want = q.get('sort');
+    if(want){
+      for(var i=0;i<COLS.length;i++){
+        if(COLS[i].key === want){ state.key = want; break; }
+      }
+    }
+    var dir = String(q.get('dir') || '').toLowerCase();
+    if(dir === 'asc'){ state.dir = 1; }
+    else if(dir === 'desc'){ state.dir = -1; }
+  })();
 
   document.getElementById('c-total').textContent = SUMMARY.total;
   ['keep','review','remove'].forEach(function(c){
@@ -235,21 +279,31 @@ PAGE_TAIL = """<section class="remove-panel">
   });
 
   function badge(c){
-    return '<span class="b-'+c+'>'+esc(c)+'</span>';
+    // FOR-57: 旧写法里 span 的 class 属性少了闭合引号，浏览器把
+    // 尖括号之后一路吞进 class 值，后面所有单元格塌成一坨转义文本。
+    // 属性值和文本都过 esc()，属性里就不可能被引号撬出去。
+    var label = esc(String(c==null?'':c));
+    return '<span class="b-'+label+'">'+label+'</span>';
   }
   function visible(){
     var rs = DATA.slice();
     if(state.cls !== 'all'){
       rs = rs.filter(function(r){ return r['class']===state.cls; });
     }
+    var kind = sortKind(state.key);
     rs.sort(function(a,b){
       var x = a[state.key], y = b[state.key];
       if(x==null && y==null) return 0;
       if(x==null) return 1;
       if(y==null) return -1;
-      var d = (state.sort==='num')
-        ? (Number(x)-Number(y))
-        : String(x).localeCompare(String(y));
+      var d;
+      if(kind === 'num'){
+        d = Number(x) - Number(y);
+        // 数值列里混进非数字（脏数据）时退回字典序，别让 NaN 比较把顺序变成随机。
+        if(isNaN(d)){ d = String(x).localeCompare(String(y)); }
+      } else {
+        d = String(x).localeCompare(String(y));
+      }
       return d * state.dir;
     });
     return rs;
@@ -258,7 +312,15 @@ PAGE_TAIL = """<section class="remove-panel">
     var thead = document.getElementById('thead');
     var html = '';
     COLS.forEach(function(c){
-      html += '<th data-key="'+esc(c.key)+'">'+esc(c.label)+'</th>';
+      // FOR-58: 排序真的生效了，得让用户看得见按哪列、往哪个方向排。
+      var sorted = (state.key === c.key);
+      var attrs = ' data-key="' + esc(c.key) + '"';
+      var mark = '';
+      if(sorted){
+        attrs += ' aria-sort="' + (state.dir < 0 ? 'descending' : 'ascending') + '"';
+        mark = '<span class="caret">' + (state.dir < 0 ? '\u2193' : '\u2191') + '</span>';
+      }
+      html += '<th' + attrs + '>' + esc(c.label) + mark + '</th>';
     });
     thead.innerHTML = html;
     Array.prototype.forEach.call(thead.querySelectorAll('th'), function(th){
@@ -277,6 +339,7 @@ PAGE_TAIL = """<section class="remove-panel">
         if(c.key==='reason'){
           return '<td class="reason">'+esc(String(r['reason']||'').slice(0,160))+'</td>';
         }
+        if(c.text){ return '<td>'+fmtText(r[c.key])+'</td>'; }
         return '<td>'+fmtNum(r[c.key])+'</td>';
       }).join('');
       return '<tr class="'+esc(r['class'])+'">'+cells+'</tr>';
@@ -316,10 +379,8 @@ PAGE_TAIL = """<section class="remove-panel">
 </html>
 """
 
-def _html_escape(text) -> str:
-    s = str(text or "")
-    return (s.replace("&", "&amp;").replace("<", "&lt;")
-            .replace(">", "&gt;").replace('"', "&quot;"))
+# FOR-58 W-4：转义的唯一一份实现在 export.py（Markdown 表格也要用同一份），
+# 这里 import 进来给 warning_html 用 - 不再留第二份，免得两处各修一半。
 
 
 def warning_html(results: list) -> str:
@@ -330,15 +391,25 @@ def warning_html(results: list) -> str:
     return '<p class="warn">%s</p>' % _html_escape(warning)
 
 
+def _embed_json(payload) -> str:
+    r"""内嵌进 <script type="application/json"> 的 JSON：不让里面出现一个 '<'。
+
+    FOR-58 同一列的第二个洞：原来只把 `</script>` 换成 `<\/script>`，但 HTML 解析器
+    认标签不认大小写，昵称里的 `</SCRIPT>` 照样把这段 script 元素提前关掉 - 整页表格
+    直接塌（渲染层取证连 JSON 都解析不出来）。`<!--` 还会把解析器带进
+    escaped / double-escaped 状态。把 '<' 统一写成反斜杠-u003c（JSON 里等价），
+    标签却永远闭不上。
+    """
+    return json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
+
+
 def build_page_html(results: list, summary: dict, version: str = None) -> str:
     """Render the single page report with the results embedded (ASCII-safe)."""
     if version is None:
         version = __version__
     rows = _display_rows(results)
-    data_json = json.dumps(rows, ensure_ascii=False)
-    data_json = data_json.replace("</script>", "<\\/script>")
-    summary_json = json.dumps(summary, ensure_ascii=False)
-    summary_json = summary_json.replace("</script>", "<\\/script>")
+    data_json = _embed_json(rows)
+    summary_json = _embed_json(summary)
     page = PAGE_HEAD + PAGE_TAIL
     return (page
             .replace("__VER__", str(version))
