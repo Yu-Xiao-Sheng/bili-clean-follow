@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 
+## [0.1.3] - 2026-10-25
+
+### Fixed
+- **Web 报告渲染层两个 P0（FOR-57）**：`fmtNum()` 把参数本身改写成 `Number(v)`，非数字原值走到「转不动」分支时打印的已经是那个数字 ⇒ 昵称 / 信号 / 粉丝比三列在真实浏览器里全是字面量 `NaN`；`badge()` 的 span `class` 属性缺闭合引号 ⇒ 浏览器把 `>` 之后一路吞进 class 值，后面所有单元格塌成一坨转义文本（`&lt;/td&gt;&lt;td&gt;...`）。文本列（`COLS` 里标 `text:1` 的三列）改走新的 `fmtText`，原值转义；`fmtNum` 保留原值、只把转换结果放进局部变量（数字列最多两位小数，`3.14` 不再被截成 `3.1`）；徽章 span 的属性值与文本同样过 `esc()`，属性不可能被引号撬开。这两种坏法在 HTTP 响应体里都看不见，所以 `tests/test_web.py` 全绿与「页面不可读」同时成立（与 FOR-41 同构）
+- Markdown 报告的 Name 列没过任何转义（FOR-58）：昵称里的竖线把 7 列的表格撑成 8/9/10 列，换行还会把一行截断。新增 `_md_cell`（HTML 转义 + 反斜杠/竖线转义——先翻倍反斜杠再转义竖线，否则昵称自带的反斜杠会把补上的转义顶掉——外加折行压平），Name 与 Reason 两列走它；CSV 仍是数据层，不做转义（有测试钉住）
+- 昵称里的 `<script>` / `<img onerror>` 原样写进 report.md，用户用浏览器或 Typora 预览报告就会执行（FOR-58）：转义实现复用 Web 端已有的 `_html_escape`，把它的唯一一份实现从 `web.py` 搬到 `export.py`，`web.py` 改成 import，不留第二份（测试断言 `web._html_escape is export._html_escape`）
+- 内嵌进 JSON `<script>` 元素的昵称只把 `</script>` 写成 `<\/script>`，但 HTML 解析器认标签不认大小写：昵称里的 `</SCRIPT>` 会提前关掉 script 元素、整页表格塌掉（实测连内嵌 JSON 都解析不出来）（FOR-58）。现在把 `<` 统一写成反斜杠-u003c
+- `tools/probe_web_render.py` 在 Windows 中文控制台假红（FOR-59）：`PYTHONIOENCODING=gbk` + `PYTHONUTF8=0` 下跑这条门禁，渲染层断言其实全部通过，但 `print_report` 打含 emoji 的昵称时炸出 `UnicodeEncodeError: 'gbk' codec can't encode character '\U0001f600'`、进程 exit=1；本地复核会被误导，而 CI 只跑 ubuntu 抓不到这个环境。入口与 `print_report` 现在都走 `bili.streams.harden_stdio()`（与 CLI / Web / demo 同一份兜底，沿用 FOR-38 已定型的口径，不留第二份实现）
+
+### Changed
+- Web 表头排序修掉死字段（FOR-58）：比较器读的是从来没赋值的 `sort`（`state` 只有 `{cls,key,dir}`），所以「得分」「最近活跃(天)」「最新视频(天)」永远按字典序——100 排在 20 前面，`COLS` 里的 `sort:'num'` 是死字段。排序类型现在只从 `COLS` 查（`sortKind`），数值列按数值排、非数字脏数据退回字典序；表头加 ↑/↓ 与 `aria-sort` 指示，并新增 `/?sort=<key>&dir=<asc|desc>` 预置排序（既是深链，也让 `--dump-dom` 的渲染层取证能钉住排序：headless 不会点表头）
+- README.md / README_en.md 测试条数口径 230 → 233 → 244 → 247，由 `tests/test_release_hygiene.py` 钉死：README 写的条数与 `pytest --collect-only` 实际收集数不一致时 CI 直接红
+
+### Added
+- 真实 chromium 渲染层断言进 CI（FOR-57）：`tools/probe_web_render.py` 起 `python -m bili.web` + headless chromium `--dump-dom`，对渲染后的 `<tbody>` 断言（真实导出夹具 + 「昵称像数字 / 含 HTML / 为空」的对抗夹具），命令行可直接跑、也供测试复用；`tests/test_web_render.py` 把这套断言收进 pytest（本机无 chromium 时跳过）；`.github/workflows/ci.yml` 新增 web-render job（playwright chromium + `BILI_REQUIRE_BROWSER=1`），浏览器装不上就红，门禁不会悄悄空跑
+- 排序取证（FOR-58）：`tools/probe_web_render.py` 的数值跨度夹具 + `check_sort` 单调性断言（`3.14 < 20 < 100`、换一列排行序必须跟着那一列走、空值永远垫底）——字典序的坏法在单调性上立刻露馅，不必复刻 JS 比较器
+- `tests/test_probe_console.py`（FOR-59）：不需要浏览器的输出编码钉——在 `PYTHONIOENCODING=gbk`（换 `cp936` 再钉一次）+ `PYTHONUTF8=0` 下调用 `print_report` 不得抛 `UnicodeEncodeError`、退出码必须 0，并 pin 住入口与 `print_report` 两处 `harden_stdio()`
+
 ## [0.1.2] - 2026-10-24
 
 ### Changed
