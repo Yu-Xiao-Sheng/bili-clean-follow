@@ -13,7 +13,7 @@ const TOPICS = ["bilibili", "python", "cli", "web-ui", "organize", "report-only"
 const FILES: Array<[string, string, string]> = [
   ["src/bili", "分析引擎 + bili-clean + bili-merge", "今天"],
   ["docs", "getting-started · scoring-model · spec", "今天"],
-  ["tests", "pytest 套件（230 个用例，CI 每次跑）", "今天"],
+  ["tests", "pytest 套件（247 个用例，CI 每次跑）", "今天"],
   ["assets", "logo · banner", "3 天前"],
   ["README.md", "中文优先，可切换英文", "今天"],
   ["pyproject.toml", "pip install -e . 即可使用", "今天"],
@@ -161,7 +161,7 @@ export const RepoPanel: React.FC<{ width?: number; from?: number }> = ({
           >
             <div style={{ fontSize: 22, color: FG, fontWeight: 700 }}>Releases</div>
             <div style={{ fontSize: 22, color: "#C7D0DD", marginTop: 12 }}>
-              <span style={{ color: "#58A6FF" }}>v0.1.2</span> · Latest
+              <span style={{ color: "#58A6FF" }}>v0.1.3</span> · Latest
               <span
                 style={{
                   marginLeft: 10,
@@ -172,10 +172,10 @@ export const RepoPanel: React.FC<{ width?: number; from?: number }> = ({
                   color: KEEP,
                 }}
               >
-                未知即中立
+                真实浏览器可读
               </span>
             </div>
-            <div style={{ fontSize: 20, color: DIM, marginTop: 6 }}>含 zip 安装包 · v0.1.1 / v0.1.0 也在</div>
+            <div style={{ fontSize: 20, color: DIM, marginTop: 6 }}>含 zip 安装包 · v0.1.2 / v0.1.1 也在</div>
           </div>
           <div
             style={{

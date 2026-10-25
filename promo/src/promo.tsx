@@ -11,7 +11,7 @@ export const PROMO_FRAMES = 1730;
 
 const termLines: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
   ["pip install -e .", "cmd"],
-  ["Successfully installed bili-clean-follow-0.1.2", "out"],
+  ["Successfully installed bili-clean-follow-0.1.3", "out"],
   ["python -m bili.demo", "cmd"],
   ["Sample follows written to sample-follows.json", "out"],
   ["bili-clean sample-follows.json \\", "cmd"],
@@ -26,14 +26,14 @@ const termLines: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
 
 const mergeLines: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
   ["bili-merge follows.json --template signals.csv", "cmd"],
-  ["第 1 步 · 模板已生成：signals.csv（20 行 · utf-8 BOM · Excel 双击不乱码）", "out"],
-  ["  mid 与昵称已预填，你只填 4 个数字列，拿不到的留空", "dim"],
+  ["第 1 步 · 模板已生成：[OK] signals.csv（20 行，utf-8 BOM，Excel/WPS 双击不乱码）", "out"],
+  ["  mid 与昵称已经预填好，你只需要填 4 个数字列，不用抄 mid。", "dim"],
   ["bili-merge follows.json --signals signals.csv --out follows.merged.json", "cmd"],
-  ["第 2 步 · 合并信号：19 行给了信号，1 行留空", "out"],
-  ["  新增信号字段 57 个 · 已写出 follows.merged.json", "dim"],
+  ["第 2 步 · 合并信号：[OK] signals-filled.csv（19 行给了信号，1 行留空）", "out"],
+  ["  新增信号字段 57 个，覆盖已有字段 0 个", "dim"],
   ["bili-clean follows.merged.json --md report.md", "cmd"],
-  ["缺信号警告: 0/20 —— recency 齐了，remove 才有依据", "ok"],
   ["Summary: keep=10 review=8 remove=2", "ok"],
+  ["Done. This tool reports only; it never unfollows by itself.", "dim"],
 ];
 
 const Pillar: React.FC<{
@@ -152,7 +152,7 @@ const Steps: React.FC = () => (
     </Fade>
     <div style={{ display: "flex", gap: 30, marginTop: 50, alignItems: "stretch" }}>
       {[
-        ["01", "导出", "浏览器 F12 → Network\n关注列表响应直接存盘\n（v0.1.2 认 B站 原始信封）", ACCENT],
+        ["01", "导出", "浏览器 F12 → Network\n关注列表响应直接存盘\n（v0.1.2 起认原始信封）", ACCENT],
         ["02", "补信号", "bili-merge 生成待填模板\nExcel 里填 4 个数字列\n拿不到的留空", WARN],
         ["03", "分析", "bili-clean follows.json\n按最近活跃 / 影响力 / 内容相关度\n逐项打分并给理由", KEEP],
         ["04", "审核", "report.md · report.csv · Web 报告\n取关清单你自己导出、自己动手", REVIEW],
@@ -285,7 +285,8 @@ const Honesty: React.FC = () => (
     <Fade from={64} dur={22}>
       <div style={{ fontSize: 32, color: DIM, marginTop: 40, lineHeight: 1.85, maxWidth: 1400 }}>
         v0.1.1 把「不知道」按最低分算，真实导出会一边倒建议取关 —— 那是 bug，我们公开承认了。<br />
-        v0.1.2 改成中立：缺 recency 一律不进 remove，报告顶部还会打一行缺信号警告。
+        v0.1.2 改成中立：缺 recency 一律不进 remove，报告顶部还会打一行缺信号警告。<br />
+        v0.1.3 修的是报告本身：Web 界面不再渲染成 NaN，Markdown 表格与数值排序也修好了。
       </div>
     </Fade>
     <div style={{ display: "flex", gap: 34, marginTop: 44, alignItems: "center" }}>
@@ -441,7 +442,7 @@ export const PromoV2: React.FC = () => {
         }}
       >
         <div style={{ fontFamily: MONO_STACK, fontSize: 22, color: "#455063" }}>
-          bili-clean-follow · v0.1.2 · MIT
+          bili-clean-follow · v0.1.3 · MIT
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

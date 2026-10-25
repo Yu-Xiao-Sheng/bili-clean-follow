@@ -127,9 +127,9 @@ const T1: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
   ["git clone https://github.com/Yu-Xiao-Sheng/bili-clean-follow.git", "cmd"],
   ["cd bili-clean-follow", "cmd"],
   ["pip install -e .", "cmd"],
-  ["Successfully installed bili-clean-follow-0.1.2", "ok"],
+  ["Successfully installed bili-clean-follow-0.1.3", "ok"],
   ["bili-clean --version", "cmd"],
-  ["bili-clean 0.1.2", "out"],
+  ["bili-clean 0.1.3", "out"],
 ];
 
 const T2: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
@@ -147,19 +147,19 @@ const T2: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
 
 const T3: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
   ["python -m bili.web --input sample-follows.json --port 8787", "cmd"],
-  ["Serving local report on http://127.0.0.1:8787", "out"],
-  ["(浏览器打开即可，Ctrl+C 结束)", "dim"],
+  ["total=24 keep=13 review=2 remove=9", "out"],
+  ["open http://127.0.0.1:8787", "ok"],
 ];
 
 const T4: Array<[string, "cmd" | "out" | "dim" | "ok" | "warn"]> = [
   ["bili-clean follows.json --md report.md", "cmd"],
-  ["缺信号警告: 20/20 的记录没有 recency 信号", "warn"],
+  ["缺信号警告 missing-signal warning: 20/20 (100%) 的记录没有 recency 信号。", "warn"],
   ["Summary: keep=0 review=20 remove=0", "ok"],
   ["bili-merge follows.json --template signals.csv", "cmd"],
-  ["第 1 步 · 模板已生成（20 行，mid + 昵称已预填，Excel 直接填）", "out"],
-  ["  要填 4 列：last_seen_days / last_video_days / follower / following", "dim"],
+  ["第 1 步 · 模板已生成：[OK] signals.csv（20 行，utf-8 BOM）", "out"],
+  ["  要填的四列（拿不到的留空，空 = 未知，未知不会被当成取关理由）：", "dim"],
   ["bili-merge follows.json --signals signals.csv --out follows.merged.json", "cmd"],
-  ["第 2 步 · 合并：新增 57 个信号字段，1 行留空", "out"],
+  ["第 2 步 · 合并信号：[OK] signals-filled.csv（19 行给了信号，1 行留空）", "out"],
   ["bili-clean follows.merged.json --md report.md", "cmd"],
   ["Summary: keep=10 review=8 remove=2", "ok"],
 ];
@@ -259,7 +259,7 @@ const W2: React.FC = () => (
     <Fade from={110} dur={20}>
       <div style={{ fontSize: 27, color: DIM, marginTop: 24, lineHeight: 1.7, width: 1620, textAlign: "center" }}>
         把响应整个另存为 <span style={{ fontFamily: MONO_STACK, color: FG }}>follows.json</span>
-        ：v0.1.2 直接认 <span style={{ fontFamily: MONO_STACK, color: FG }}>code / data.follower</span> 这层信封，昵称也认{" "}
+        ：v0.1.2 起直接认 <span style={{ fontFamily: MONO_STACK, color: FG }}>code / data.follower</span> 这层信封，昵称也认{" "}
         <span style={{ fontFamily: MONO_STACK, color: FG }}>uname</span> —— 不用手工解包、不用改字段名
       </div>
     </Fade>
@@ -458,7 +458,7 @@ export const Walkthrough: React.FC = () => {
       <Audio src={staticFile("audio/bgm-walk.wav")} volume={0.42} />
       <AbsoluteFill style={{ pointerEvents: "none", justifyContent: "flex-end", padding: 40 }}>
         <div style={{ fontFamily: MONO_STACK, fontSize: 22, color: "#455063" }}>
-          bili-clean-follow · 使用教程 · v0.1.2
+          bili-clean-follow · 使用教程 · v0.1.3
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

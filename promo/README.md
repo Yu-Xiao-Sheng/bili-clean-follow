@@ -25,7 +25,7 @@ python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pill
 音轨由 `tools/gen_bgm.mjs` 本地合成（和弦垫 + 琶音 + 轻 kick + hat，master 归一化），
 时长精确对齐成片帧数；`public/audio/*.wav` 不提交，`npm run render` 会先生成。
 
-## 两支成片（口径对齐 v0.1.2）
+## 两支成片（口径对齐 v0.1.3）
 
 ### 1. 产品介绍片 `BiliCleanPromo` — 1730 帧 / 57.7 秒
 
@@ -33,7 +33,7 @@ python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pill
 |---|---|---|
 | Hook | 0-110 | 关注数从 128 跳到 812，落在「有多少个你已经一年没打开过」 |
 | Positioning | 110-230 | 一句话定位：它不替你取关，只把 812 个关注摊开 |
-| RepoScene | 230-420 | GitHub 仓库实景：Releases v0.1.2（Latest）、230 个测试用例、MIT |
+| RepoScene | 230-420 | GitHub 仓库实景：Releases v0.1.3（Latest）、247 个测试用例、MIT |
 | Steps | 420-590 | 四步：导出 / 补信号 / 分析 / 审核 |
 | Terminal | 590-800 | 真实运行记录（示例 24 条 -> keep=13 review=2 remove=9） |
 | WebScene | 800-950 | 本地 Web 报告真实截图（127.0.0.1:8787） |
@@ -58,13 +58,15 @@ python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pill
 
 ## 文案的事实来源
 
-片子里每一条终端输出都不是手写剧本，而是 v0.1.2 在 Windows / Python 3.13.15 上真实跑出来的：
+片子里每一条终端输出都不是手写剧本，而是 v0.1.3 在 Windows / Python 3.13.15 上真实跑出来的：
 
 - 示例数据：`python -m bili.demo` + `bili-clean sample-follows.json` -> `Summary: keep=13 review=2 remove=9`
 - 真实形状夹具（`tests/fixture-bili-real-list.json`，20 条，只有昵称和签名）：
   补信号前 `缺信号警告: 20/20 (100%) 的记录没有 recency 信号` + `Summary: keep=0 review=20 remove=0`
 - 同一份夹具经 `bili-merge --template` / `--signals` 补齐后：`新增信号字段 57 个`、`Summary: keep=10 review=8 remove=2`
-- 仓库面板里的 `230 个用例` = `python -m pytest -q` 的实际结果（v0.1.2，230 passed）
+- 仓库面板里的 `247 个用例` = `python -m pytest tests -q` 的实际结果（v0.1.3，247 passed）
+- `bili-clean --version` -> `bili-clean 0.1.3`；`pip install -e .` -> `Successfully installed bili-clean-follow-0.1.3`
+- `python -m bili.web --input sample-follows.json --port 8787` -> `total=24 keep=13 review=2 remove=9` + `open http://127.0.0.1:8787`
 
 改代码前后请重跑上面三条命令，别让片子讲一个已经过时的版本。
 
@@ -91,9 +93,15 @@ python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pill
 `NaN` 或被转义的标签、徽章数量 = 行数、每个分类的行数 = Summary 计数）。断言不过就不出图、退出码 3。
 在 `main = 10ca868` 上跑它是红的（退出码 3，两条问题），这正是 v0.1.2 界面真实的渲染状态。
 
-**发布前置**：本分支的 `webui.png` 来自 `54e1b8a`（含 FOR-57 的渲染层 P0 修复与 FOR-58 的数值列排序）。
-FOR-57 → FOR-58 合入 main 并切 v0.1.3 之前，两支片子的 Web 镜头与 STEP 5 都不适用于已发布的 v0.1.2，
-发帖物料只能先用不含 Web 镜头的版本。
+**当前状态（2026-10-25）**：FOR-57 / FOR-58 已合入 main（merge `5f40ec3` / `3af65b2`），已切 tag `v0.1.3`
+（tag object `1ba7052` -> commit `40d712b`），Release v0.1.3 已带 zip 附件。本分支的 `webui.png` 是在这个
+状态下重截的：`sha256 A00BA6A8DC625779CA035FC52F93F6A7D14086CE9886BAE891C39B778E059F14`（20 行 / 20 个徽章 /
+无 NaN / 无转义标签），Web 镜头与 STEP 5 适用于已发布的 v0.1.3。v0.1.2（tag `4a229ce`）的用户看到的
+还是坏界面 —— 所以「界面能不能入镜」每次发版都要重跑这条门禁，而不是记住上次的结论。
+
+`shot_webui.py` 另外钉了一层来源检查：它断言 `bili.__file__` 就在当前工作树的 `src/` 下。
+本轮真实踩到过：某个 venv 的 editable install 指向另一个 checkout（v0.1.1），不打印来源的话，
+门禁全绿也可能给旧界面出图。现在 OK 行会把 bili 版本一起打出来。
 
 ### 重截与重渲（改完 web.py 必须重跑）
 
@@ -116,4 +124,4 @@ python qa.py out/frames/promo out/frames/walk                           # qa.py 
 ```
 
 qa.py 报 BLANK（ink < 200）或 TOUCHES_EDGE（内容贴到 1080 画布边缘）就退回排版重做。
-本轮实测：58 + 62 = 120 个抽样帧，0 BLANK、0 TOUCHES_EDGE，最小 ink=915。
+本轮实测（v0.1.3 重渲）：58 + 62 = 120 个抽样帧，0 BLANK、0 TOUCHES_EDGE，最小 ink=917。
