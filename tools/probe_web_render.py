@@ -17,6 +17,9 @@
 浏览器查找顺序：环境变量 BILI_CHROME -> PATH 里的 chrome-headless-shell / chromium /
 chrome -> Playwright 缓存目录里的 chromium / chrome-headless-shell。
 
+Windows 中文控制台（GBK/cp936）下也能直接跑：入口与 print_report 都走
+bili.streams.harden_stdio()，含 emoji 的真实昵称不会把取证脚本自己炸掉（FOR-59）。
+
 退出码：0 = 渲染层断言全过；1 = 有断言失败；2 = 环境起不来（缺浏览器 / 服务起不来）。
 """
 
@@ -38,6 +41,10 @@ import time
 import urllib.request
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from bili.streams import harden_stdio  # noqa: E402  # 与 CLI/Web 同一份 stdout 兜底（FOR-38）
+
 PY = sys.executable
 DEFAULT_INPUT = REPO_ROOT / "tests" / "fixture-bili-real.json"
 DATA_RE = re.compile(r'<script type="application/json" id="bili-data">(.*?)</script>', re.S)
@@ -408,6 +415,9 @@ def assertions(result: dict, check_numbers: bool = False) -> list:
 
 
 def print_report(result: dict, check_numbers: bool = False, dom_chars: int = 1500) -> None:
+    # FOR-59：Windows 中文控制台（GBK/cp936）打含 emoji 的昵称会 UnicodeEncodeError，
+    # 于是「渲染断言全过」与「进程 exit=1」同时成立 —— 门禁假红。打报告前先兜 stdout。
+    harden_stdio()
     if not result.get("ok"):
         print("[probe] %s: bili.web 起不来\n%s" % (result.get("label"), result.get("log", "")))
         return
@@ -432,6 +442,7 @@ def main(argv=None) -> int:
     ap.add_argument("--port", type=int, default=0, help="0 = 自动挑空闲端口")
     ap.add_argument("--dump-out", default="", help="整页 dump-dom 存这个文件，便于贴证据")
     args = ap.parse_args(argv)
+    harden_stdio()  # FOR-59：入口就把 stdout/stderr 兜成 UTF-8 + replace，GBK 控制台不炸
 
     browser = find_browser()
     if not browser:

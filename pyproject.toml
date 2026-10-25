@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bili-clean-follow"
-version = "0.1.2"
+version = "0.1.3"
 description = "Analyze and clean your Bilibili follow list into keep / review / remove."
 readme = "README.md"
 license = "MIT"
