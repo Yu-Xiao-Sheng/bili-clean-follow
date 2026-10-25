@@ -6,7 +6,17 @@ An open-source tool that analyzes your Bilibili follow list and classifies each
 follow into **keep / review / remove** with explainable reasons — so you can
 clean up stale, inactive, or low-value follows with confidence.
 
-> 🎬 **Two ~60-second films** (1080p, with audio): [product intro](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4) · [walkthrough](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+## Demo · you can watch it the moment this page opens (two ~60-second films, 1080p, with audio)
+
+![Inline preview of the product intro film: 58 seconds, autoplays when you open this page](assets/preview-promo.gif)
+
+**1. Product intro (58 s)** — [▶ Watch online (Pages landing page, streams in the browser)](https://yu-xiao-sheng.github.io/bili-clean-follow/#promo) · [download 1080p mp4](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4)
+
+![Inline preview of the walkthrough film: the whole flow from export to report, looping](assets/preview-walkthrough.gif)
+
+**2. Walkthrough (62 s)** — [▶ Watch online (Pages landing page, streams in the browser)](https://yu-xiao-sheng.github.io/bili-clean-follow/#walkthrough) · [download 1080p mp4](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+
+> Those two images are **inline GIF previews**: they animate as soon as you open this page — no click, no download. GitHub cannot embed an mp4 player in a README (an mp4 link renders as a download link, `<video>` is sanitized away, and a YouTube link does not become a player either), so the full 1080p films stream from the Pages landing page; Bilibili / YouTube links get added once the films are on the official channels. Details: [docs/video-hosting.md](docs/video-hosting.md).
 
 ## Why
 You may have a few hundred (or thousand) Bilibili follows, many of which you
@@ -33,7 +43,7 @@ to unfollow.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 248 tests green).
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 254 tests green).
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 
@@ -124,8 +134,11 @@ The score is a weighted average over the **provided** signals only: `score = sum
 ```
 src/bili/        # package: model, loaders, score, export, cli, demo
 tests/           # pytest suite
-docs/            # spec.md, getting-started.md, scoring-model.md
-.github/         # CI workflow
+assets/          # inline GIF previews + film posters (built by tools/build_readme_preview.py)
+pages/           # GitHub Pages landing page (<video controls poster> streams the 1080p films)
+docs/            # spec.md, getting-started.md, scoring-model.md, video-hosting.md
+tools/           # build_readme_preview.py, publish_pages.py, probe_web_render.py
+.github/         # CI workflows (ci.yml, pages.yml)
 pyproject.toml
 ```
 

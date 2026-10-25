@@ -1,11 +1,19 @@
-"""发布口径自检（FOR-35）。
+"""发布口径自检（FOR-35 + FOR-66）。
 
 v0.1.2 这轮真正反复出问题的不是功能，是口径：README 写 63、Release 说明写 62、
 文档里还挂着上一版的 zip。这类断层靠人肉复验太贵，所以钉成测试：
 版本号只有一个来源，Release 链接只有一个版本，README 的测试条数必须是真的。
+
+FOR-66 把同一套办法用在视频口径上。实测（GET /repos/{owner}/{repo}/readme +
+Accept: application/vnd.github.html，取证见 docs/video-hosting.md）证明 GitHub README
+里 mp4 只会渲染成下载链接、`<video>` 会被 sanitizer 清成空 `<p>`、YouTube 链接也不会
+内嵌播放器——README 首屏唯一能自动播的是动画图像。于是"打开就能看见"变成三条硬约束：
+README 第一屏内联 GIF（<= 8 MB）、存在点开即播的入口（Pages / B站 / YouTube）、
+mp4 绝不进 main 的 git 历史。少任何一条都会退回"用户只能下载"的老问题，所以全部钉成门禁。
 """
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -94,3 +102,106 @@ def _collected_count():
     match = re.search(r"(\d+) tests? collected", out.stdout)
     assert match, out.stdout[-1500:]
     return int(match.group(1))
+
+
+# --- FOR-66：README 的"打开就能看见"口径 -------------------------------------
+# 三条约束各自对应一种已经实测过的坏法：GIF 缺失 => 首屏只有下载链接；
+# 只有 mp4 链接 => 用户必须下载 7 MB 才知道片子讲什么；mp4 进 main => repo size 爆炸。
+INLINE_ANIMATED = re.compile(r"!\[[^\]]*\]\((assets/preview-[^)\s#]+\.(?:gif|webp))\)")
+MP4_LINK = re.compile(r"\]\((https?://[^)\s]+\.mp4)\)")
+STREAM_LINK = re.compile(r"\]\((https?://[^)\s]*(?:github\.io|bilibili\.com/video"
+                         r"|youtube\.com/(?:watch|shorts|embed))[^)\s]*)\)")
+FILM_SLUGS = ("promo", "walkthrough")
+VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".m4v", ".avi", ".mkv")
+# GitHub 单张图上限 10 MB，README 内联留 2 MB 余量（首屏加载也吃这个大小）。
+GIF_BUDGET = 8 * 1024 * 1024
+READMES = ("README.md", "README_en.md")
+
+
+def _first_screen_limit(text):
+    """第二个小节标题的位置：内联预览必须落在它之前，否则要滚动才看得见画面。"""
+    heads = [m.start() for m in re.finditer(r"(?m)^## ", text)]
+    return heads[1] if len(heads) > 1 else len(text)
+
+
+def test_readmes_lead_with_an_inline_animated_preview():
+    for rel in READMES:
+        text = _read(rel)
+        match = INLINE_ANIMATED.search(text)
+        assert match, ("%s 引用不到内联动画资产（assets/preview-*.gif|webp）；"
+                       "GitHub README 里 mp4 不会自动播，首屏必须有 GIF" % rel)
+        limit = _first_screen_limit(text)
+        assert match.start() < limit, (
+            "%s 的内联预览在第 %d 字符，第二小节从第 %d 字符才开始——用户要滚动才看见画面"
+            % (rel, match.start(), limit))
+
+
+def test_inline_preview_assets_exist_and_fit_the_github_budget():
+    refs = set()
+    for rel in READMES:
+        refs.update(INLINE_ANIMATED.findall(_read(rel)))
+    assert refs, "没有任何 README 引用内联动画资产"
+    for rel in sorted(refs):
+        path = REPO_ROOT / rel
+        assert path.exists(), "%s 被 README 引用但文件不存在（跑 tools/build_readme_preview.py）" % rel
+        size = path.stat().st_size
+        assert size > 100 * 1024, "%s 只有 %d 字节，像是空壳" % (rel, size)
+        assert size <= GIF_BUDGET, (
+            "%s 是 %.2f MB，超过 README 内联预算 %.0f MB（重跑 tools/build_readme_preview.py 会自动降质）"
+            % (rel, size / 1048576.0, GIF_BUDGET / 1048576.0))
+
+
+def test_every_film_with_a_download_link_also_has_a_click_to_play_entry():
+    """mp4 下载链接不许是某支影片的唯一入口——那正是 FOR-66 要修的坏法。"""
+    for rel in READMES:
+        text = _read(rel)
+        previews = INLINE_ANIMATED.findall(text)
+        downloads = MP4_LINK.findall(text)
+        streams = STREAM_LINK.findall(text)
+        for slug in FILM_SLUGS:
+            assert any(slug in ref for ref in previews), (
+                "%s 里没有 %s 这支影片的内联预览 GIF" % (rel, slug))
+            if any(slug in url for url in downloads):
+                assert any(slug in url for url in streams), (
+                    "%s 里 %s 只有 mp4 下载链接，没有点开即播入口（Pages / B站 / YouTube）"
+                    % (rel, slug))
+
+
+def test_pages_landing_page_streams_both_films():
+    html = _read("pages/index.html")
+    assert "<video" in html, "pages/index.html 没有 <video>，README 的在线观看会 404"
+    assert "<script" not in html, "落地页不需要 JS；少一分依赖，也少一分注入面"
+    for slug in FILM_SLUGS:
+        assert 'src="bili-clean-%s.mp4"' % slug in html, (
+            "落地页里没有 %s 这支影片的 <video src>" % slug)
+        assert 'poster="poster-%s.jpg"' % slug in html, (
+            "落地页缺 poster-%s.jpg：首帧没画面，用户不知道要不要点播放" % slug)
+        assert 'controls' in html and 'preload="metadata"' in html, (
+            "<video> 必须 controls + preload=metadata（边下边播，不整片预载）")
+
+
+def test_pages_deploy_path_is_still_wired_up():
+    """README 指向 Pages；部署通道被删了就得同时改掉 README，否则链接集体 404。"""
+    text = _read(".github/workflows/pages.yml")
+    for needle in ("actions/upload-pages-artifact", "actions/deploy-pages",
+                   "gh release download"):
+        assert needle in text, "pages.yml 里的 %s 没了（README 的在线观看入口随之失效）" % needle
+
+
+def _tracked_files():
+    git = shutil.which("git")
+    if git is None:
+        import pytest
+        pytest.skip("git unavailable; cannot enumerate tracked files")
+    proc = subprocess.run([git, "ls-files"], cwd=str(REPO_ROOT),
+                          capture_output=True, text=True, check=False)
+    assert proc.returncode == 0, proc.stderr
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
+
+def test_no_video_binaries_are_committed():
+    """mp4 只活在 Release 资源与 Pages 产物里；main 的 git 历史必须保持几百 KB 量级。"""
+    bad = sorted(p for p in _tracked_files() if p.lower().endswith(VIDEO_SUFFIXES))
+    assert not bad, (
+        "仓库里提交了视频二进制：%s —— 会永久留在 main 历史里。"
+        "影片走 Release（Pages 由 tools/publish_pages.py 组装，产物在 dist/）" % ", ".join(bad))
