@@ -116,7 +116,7 @@ python -m bili.web --input sample-follows.json
 - **导出与 CLI 同一口径**：`report.md`、`report.csv`（带 UTF-8 BOM，Excel/WPS 双击不乱码）、`to-unfollow.txt`（每行 `mid <TAB> 昵称` 的人工核对清单）。
 - **凭据不出本机**：Cookie 与 Key 不进仓库、不进日志、不进导出文件；插件不联网到任何第三方服务（BYOK 的 AI 分类是后续工单，启用前会先告知发送哪些字段、发到哪个端点）。
 
-图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（35 项 node:test 用例，CI 已钉成门禁）。
+图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（36 项 node:test 用例，CI 已钉成门禁）。
 
 
 ## 如何得分

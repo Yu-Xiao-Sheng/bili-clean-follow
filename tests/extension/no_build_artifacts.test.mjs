@@ -92,3 +92,26 @@ test("插件里没有任何写接口调用与 LLM 调用（FOR-63 边界）", ()
   // 只读语义：报告产物必须自称 report-only
   assert.ok(src.includes("Report-only: this tool never unfollows anything by itself."));
 });
+
+test("manifest 与 HTML 引用的文件必须都在位（Load unpacked 不会白屏）", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(EXT, "manifest.json"), "utf8"));
+  const referenced = [
+    manifest.background.service_worker,
+    manifest.action.default_popup,
+    manifest.side_panel.default_path,
+    ...(manifest.content_scripts || []).flatMap((cs) => cs.js || []),
+  ];
+  for (const rel of referenced) {
+    assert.ok(fs.existsSync(path.join(EXT, rel)), "manifest 引用了不存在的文件：" + rel);
+  }
+  for (const html of ["popup.html", "sidepanel.html"]) {
+    const text = fs.readFileSync(path.join(EXT, html), "utf8");
+    const refs = [...text.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1])
+      .filter((r) => !/^https?:/.test(r));
+    assert.ok(refs.length, html + " 应该引用自己的 css/js");
+    for (const rel of refs) {
+      assert.ok(fs.existsSync(path.join(EXT, rel)), html + " 引用了不存在的文件：" + rel);
+    }
+    assert.ok(/<script type="module"/.test(text), html + " 必须以 ESM 加载脚本（无打包步骤）");
+  }
+});
