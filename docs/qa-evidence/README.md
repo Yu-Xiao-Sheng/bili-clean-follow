@@ -33,6 +33,21 @@ FOR-70 在 2026-10-26 明确提了这个前置，FOR-67 在此把契约定死（
 
 ## 取证时怎么生成（B 轨真实登录态只读会话）
 
+取证脚本已在 `integration/for-67-v2-tree = 67ca310` 落地：`tests/e2e/track_b_real_readonly.mjs`。
+真实会话必须带人的授权（对应 FOR-67 人工卡里的选项 id），否则脚本自己退 4，不碰真实账号：
+
+```
+# 卡片选 give_profile：给一个已登录 B站的画像目录
+node tests/e2e/track_b_real_readonly.mjs --consent=give_profile --profile=<画像目录>
+
+# 卡片选 grant_current_login：只把登录相关文件复制到临时目录再跑，不动日常 Chrome 画像
+node tests/e2e/track_b_real_readonly.mjs --consent=grant_current_login --copy-profile-from=<User Data 根目录>
+```
+
+只读是浏览器层 CDP `Fetch` 拦的（只读端点白名单 + 写端点永拒），不是靠产品代码自觉；
+`R1` 证明护栏看得见 service worker 的抓取路径、`R2` 用一次被拦的 `POST /x/relation/delete`
+做负向对照。退出码与三个 CDP 坑的口径在 `tests/e2e/README.md`。CI 上跑的是替身自检
+（`--mock`）：产物只进 `tmp/`，**永不**写这份文件——把替身当真实会话是 No-Go 硬条件④。
 抓取走扩展自身的只读路径（FOR-63 的分页抓全，`fetched >= total` 才算读全），
 把内存里的条目按上面四列导出；分类结果来自 FOR-64 的分类落库结果。导出前后各打一次
 条数，两个数不一致就别落盘——报告里那三个数（B5）会被同一条门禁抓住。
