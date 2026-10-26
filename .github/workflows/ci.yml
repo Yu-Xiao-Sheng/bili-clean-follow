@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # 分支还没合进 main 时也要能跑全套门禁：FOR-66 那张「分支怎么进 main」的卡还没答，
+  # 但取证不该因此等下去 —— 在 Actions 里对任意分支 Run workflow 就能拿到 CI 证据。
+  workflow_dispatch:
 
 jobs:
   test:
@@ -189,3 +192,45 @@ jobs:
 
       - name: Fixture + mock self-test
         run: node --test tests/e2e/*.test.mjs
+
+  # FOR-67 A 轨真机取证 job。存在的理由（FOR-71 在 be22275 上复核出的一条取证口径，我之前写错了）：
+  # ci.yml 里此前没有任何 job 调 track_a_extension_e2e.mjs，也没有装 Chrome for Testing 的步骤 ——
+  # 「CI 的 release-gate 不会因为多构建夹具假性红」的真实原因是 CI 从没跑过 A 轨真机。这条 job 补上它。
+  # 浏览器来源：Playwright 的 chromium-1248，tests/e2e/node_modules/playwright-core/browsers.json 里
+  # title 就是 "Chrome for Testing"、browserVersion 156.0.8078.4；本机实测同一构建（chromium-1248/
+  # chrome-win64/chrome.exe）用 CDP Extensions.loadUnpacked 能把这份扩展装进去并跑完 6 条断言。
+  # 多构建并存的机器交给 chrome_choice.mjs：按版本数值降序 + 真探针，不用 E2E_CHROME 也不选到老构建。
+  # 退出码：--doctor-matrix 退 3 = 这台机器没有能装扩展的构建；track_a 退 2 = 扩展装不上，退 1 = 断言判红。
+  track-a:
+    name: test - A 轨真机（真 Chromium + 未打包扩展 + B站接口替身，FOR-67）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install harness deps (tests/e2e only; extension/ stays dependency-free)
+        run: npm ci --prefix tests/e2e
+
+      - name: Install Chrome for Testing (Playwright chromium) + system deps
+        run: node tests/e2e/node_modules/playwright/cli.js install --with-deps chromium
+
+      - name: Environment probe - every candidate build, no early stop
+        run: node tests/e2e/track_a_extension_e2e.mjs --doctor-matrix
+
+      - name: A-track real-machine assertions (6/6, otherwise the job is red)
+        run: node tests/e2e/track_a_extension_e2e.mjs
+
+      # 报告与 FOR-71 复核引用的是这份构建产物，不是谁本机的 tmp 文件。
+      - name: Upload evidence (track-a.json + chrome-matrix.json)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: track-a-evidence
+          path: tmp/qa-e2e/*.json
+          if-no-files-found: warn
+

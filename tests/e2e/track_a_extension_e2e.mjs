@@ -26,7 +26,7 @@ import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
 import { SELF_MID, buildPages, resolverArgs, startMockServer, uniqueMids } from "./mock_bilibili.mjs";
-import { CFT_DIR, listChromeBuilds, selectChromeForExtensionTest } from "./chrome_choice.mjs";
+import { CFT_DIR, listChromeBuilds, probeChromeBuildMatrix, selectChromeForExtensionTest } from "./chrome_choice.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const EXT = path.join(ROOT, "extension");
@@ -329,10 +329,29 @@ async function doctor() {
     cftCandidates: listChromeBuilds().map((c) => c.dir),
     chosen: ok ? { exe: choice.exe, build: choice.build, source: choice.source } : null,
     rejected: choice.rejected,
+    note: "rejected 只包含「探到可用构建之前」被拒的那些；要全量环境矩阵跑 --doctor-matrix",
   }, null, 2));
   process.exit(ok ? 0 : 3);
 }
 
+/**
+ * --doctor-matrix：全量探针，不中途停，把「这台机器上每个构建能不能装进这份未打包扩展」整张表
+ * 打出来并写进 tmp/qa-e2e/chrome-matrix.json。
+ * 存在的理由（FOR-71 复核口径）：--doctor 探到第一个可用就停，在最高版本可用的机器上 rejected
+ * 是空的，报告引用不到 126 / 134 的原始拒因；要把环境矩阵写进报告就跑这条。
+ * 退出码同 --doctor：0 = 至少一个构建能装扩展；3 = 一个都没有。
+ */
+async function doctorMatrix() {
+  const res = await probeChromeBuildMatrix({ extDir: EXT });
+  const out = { ok: res.usable > 0, generatedAt: new Date().toISOString(), cftDir: CFT_DIR, ...res };
+  const outDir = path.join(ROOT, "tmp", "qa-e2e");
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(path.join(outDir, "chrome-matrix.json"), JSON.stringify(out, null, 2));
+  console.log(JSON.stringify(out, null, 2));
+  process.exit(out.ok ? 0 : 3);
+}
+
+if (process.argv.includes("--doctor-matrix")) await doctorMatrix();
 if (process.argv.includes("--doctor")) await doctor();
 
 const log = { track: "A", kind: "mock", startedAt: new Date().toISOString(), cases: [], numbers: {} };

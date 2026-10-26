@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { buildVersion, listChromeBuilds, selectChromeForExtensionTest } from "./chrome_choice.mjs";
+import { buildVersion, listChromeBuilds, probeChromeBuildMatrix, selectChromeForExtensionTest } from "./chrome_choice.mjs";
 
 /** 造一棵假的 browser/chrome 目录：只有目录名与 exe 文件在位即可，探针是被 stub 掉的。 */
 function fakeCftRoot(dirs, { arch = "win64" } = {}) {
@@ -122,4 +122,51 @@ test("E2E_CHROME_PROBE=0 只按版本取最高的那个，不起浏览器", asyn
   });
   assert.equal(choice.build, "win64-156.0.8078.47");
   assert.equal(choice.source, "version-only:win64-156.0.8078.47");
+});
+
+test("全量矩阵不中途停：每个候选都探一遍，能用与不能用的都在表里", async () => {
+  const root = fakeCftRoot(["win64-156.0.8078.47", "win64-134.0.6998.88", "win64-126.0.6478.127"]);
+  const seen = [];
+  const res = await probeChromeBuildMatrix({
+    env: {},
+    base: root,
+    extDir: "C:/repo/extension",
+    probe: async (exe) => {
+      const dir = path.basename(path.dirname(path.dirname(exe)));
+      seen.push(dir);
+      if (dir === "win64-156.0.8078.47") return { ok: true, product: "Chrome/156.0.0", extensionId: "abc" };
+      if (dir === "win64-134.0.6998.88") return { ok: false, product: "Chrome/134.0.0", error: "CDP -32000 Method not available." };
+      return { ok: false, product: null, error: "CDP -32601 'Extensions.loadUnpacked' wasn't found" };
+    },
+  });
+  // 与 selectChromeForExtensionTest 的区别就在这里：第一个能用也照完剩下两个。
+  assert.deepEqual(seen, ["win64-156.0.8078.47", "win64-134.0.6998.88", "win64-126.0.6478.127"]);
+  assert.equal(res.probed, 3);
+  assert.equal(res.usable, 1);
+  assert.equal(res.chosen.build, "win64-156.0.8078.47");
+  assert.equal(res.chosen.ok, true);
+  assert.deepEqual(res.matrix.map((r) => [r.build, r.ok]), [
+    ["win64-156.0.8078.47", true], ["win64-134.0.6998.88", false], ["win64-126.0.6478.127", false],
+  ]);
+  assert.match(res.matrix[1].error, /Method not available/);
+  assert.match(res.matrix[2].error, /wasn't found/);
+  assert.equal(res.matrix[0].error, null);
+});
+
+test("矩阵按版本数值降序列出，且没有候选时 usable=0（CI 上没装浏览器的读法）", async () => {
+  const root = fakeCftRoot(["win64-99.0.0", "win64-100.0.0", "win64-126.0.6478.127"]);
+  const res = await probeChromeBuildMatrix({
+    env: {}, base: root, extDir: "C:/repo/extension",
+    probe: async () => ({ ok: false, product: null, error: "CDP -32000 Method not available." }),
+  });
+  assert.deepEqual(res.matrix.map((r) => r.build), ["win64-126.0.6478.127", "win64-100.0.0", "win64-99.0.0"]);
+  assert.equal(res.usable, 0);
+  assert.equal(res.chosen, null);
+  const empty = await probeChromeBuildMatrix({
+    env: {}, base: path.join(root, "nope"), extDir: "C:/repo/extension",
+    probe: async () => { throw new Error("没有候选就不该探针"); },
+  });
+  assert.deepEqual(empty.matrix, []);
+  assert.equal(empty.probed, 0);
+  assert.equal(empty.usable, 0);
 });

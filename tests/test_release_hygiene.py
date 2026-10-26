@@ -82,6 +82,58 @@ def test_stated_test_count_matches_the_real_suite():
             % (rel, match.group(1), collected))
 
 
+def _node_test_suite_counts(dirname):
+    """真跑一次 node --test 取用例条数：不数文件、不数 test( 调用（那两种都会漂）。
+
+    文件路径由 Python 侧展开，不把 glob 交给 shell，也不依赖 node 的 glob 支持
+    （CI 的 extension job 用的是 shell 展开，ubuntu 与 windows 上行为不同）。
+    """
+    node = shutil.which("node")
+    assert node, "README 里写了 node:test 用例数，但这台机器上没有 node，无法核对"
+    files = sorted(
+        str(p.relative_to(REPO_ROOT).as_posix())
+        for p in (REPO_ROOT / "tests" / dirname).glob("*.test.mjs")
+    )
+    assert files, "tests/%s 下没有 .test.mjs 文件" % dirname
+    proc = subprocess.run(
+        [node, "--test", "--test-reporter=spec"] + files,
+        cwd=str(REPO_ROOT), capture_output=True, text=True, encoding="utf-8", check=False,
+    )
+    # spec reporter 的汇总行长这样："\u2139 tests 177" / "\u2139 pass 177" / "\u2139 fail 0"。
+    # 两个坑踩过：① 别把三行揉成一个正则（中间 "suites 0" 带数字，\D+ 跨不过去）；
+    # ② 别用 ^\W* 吃掉前缀符号 —— Python 认为 "\u2139".isalnum() 为真，它是 \w。
+    # 所以按 "非空白前缀 + 标签 + 数字 + 行尾" 取，并要求每行只出现一次（多义就判红）。
+    counts = {}
+    for label in ("tests", "pass", "fail"):
+        found = re.findall(r"(?m)^\S*\s+%s (\d+)\s*$" % label, proc.stdout)
+        assert len(found) == 1, "node --test 的 %s 汇总行不可读（找到 %d 条）：%s" % (
+            label, len(found), proc.stdout[-800:] + proc.stderr[-800:])
+        counts[label] = int(found[0])
+    total, passed, failed = counts["tests"], counts["pass"], counts["fail"]
+    assert failed == 0, "tests/%s 里有 %d 项 node:test 用例判红" % (dirname, failed)
+    assert total == passed, "tests/%s 跑完 %d 项但只有 %d 项通过" % (dirname, total, passed)
+    return total
+
+
+def test_readme_node_test_count_matches_the_real_suite():
+    """FOR-71 复核发现的文档漂移：README 写「175 项 node:test 用例」，实测 177。
+
+    pytest 那个数早就有门禁（test_stated_test_count_matches_the_real_suite），node 这一行
+    一直是裸文本 —— 补成同一条办法：跑真套件、比对 README 声称的条数。
+    """
+    real = _node_test_suite_counts("extension")
+    claimed = False
+    for rel in ("README.md", "README_en.md"):
+        match = re.search(r"(\d+) 项 node:test 用例", _read(rel))
+        if not match:
+            continue
+        claimed = True
+        assert int(match.group(1)) == real, (
+            "%s claims %s node:test cases but tests/extension runs %d"
+            % (rel, match.group(1), real))
+    assert claimed, "README.md 要写明 node:test 用例条数（它已经钉成 CI 门禁）"
+
+
 def test_privacy_md_states_the_v2_data_flow():
     """FOR-64：v2 引入 BYOK 之后，"数据不出本机"必须被改写成可核对的口径，
     而且要钉在测试里——口号漂移过一次就已经出过事故了。"""

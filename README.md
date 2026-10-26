@@ -83,7 +83,7 @@ LLM function-calling 与本地语法双轨（没 Key 也能用），任何意图
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，262 项 pytest 全绿）。igin/promo/for-66-readme-video
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，263 项 pytest 全绿）。igin/promo/for-66-readme-video
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
@@ -169,7 +169,7 @@ python -m bili.web --input sample-follows.json
 - **外发先告知**：首次启用 AI 会逐条列出「将发送 N 条昵称 + 简介到 <你填的端点>」，可改成只发昵称；载荷里没有 Cookie / UID / mid / 头像 / 关注关系，只带一次性代号 r1、r2…；换端点必须重新确认，随时可「撤回外发确认」。安装时不预授第三方权限，确认端点时才申请那一个 origin。
 - **凭据不出本机**：Cookie 与 Key 不进仓库、不进日志、不进导出文件（Key 只待在 `chrome.storage.local` 的独立键里）；没有我们的服务器，也没有遥测中转。完整口径见 [PRIVACY.md](PRIVACY.md)。
 
-图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（175 项 node:test 用例，CI 已钉成门禁；其中 62 项是 FOR-65 的：意图 DSL、diff 预览、七条护栏逐条拒、操作栈回滚、写操作边界，以及「一句话指令 → 预览 → 武装 → 取关 → 回滚」的端到端 mock 串跑；另有 FOR-68 的 25 项：油猴脚本只读护栏 14 项 + v2.0.0 发布门禁 9 项 + 交付物清单核对（含「报告 Go 之前不许挂 v2.0.0 下载链接」）2 项——报告没 Go 就打包不出 zip，也打不出 tag）。
+图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（177 项 node:test 用例，CI 已钉成门禁；其中 62 项是 FOR-65 的：意图 DSL、diff 预览、七条护栏逐条拒、操作栈回滚、写操作边界，以及「一句话指令 → 预览 → 武装 → 取关 → 回滚」的端到端 mock 串跑；另有 FOR-68 的 25 项：油猴脚本只读护栏 14 项 + v2.0.0 发布门禁 9 项 + 交付物清单核对（含「报告 Go 之前不许挂 v2.0.0 下载链接」）2 项——报告没 Go 就打包不出 zip，也打不出 tag）。
 
 
 ## 如何得分

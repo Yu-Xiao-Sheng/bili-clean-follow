@@ -180,3 +180,36 @@ export async function selectChromeForExtensionTest({
     ? { exe: first.exe, source: "version-only:" + first.dir, build: first.dir, version: first.version, rejected }
     : { exe: null, source: "none", build: null, version: null, rejected };
 }
+
+/**
+ * 全量探针矩阵：把每一个候选构建都探一遍，**不中途停**。
+ *
+ * 为什么单独要这条（FOR-71 在 be22275 上复核出的取证口径）：selectChromeForExtensionTest
+ * 是「探到第一个能用就停」，所以在这台最高版本正好能用的机器上 env.rejectedBuilds 是空数组，
+ * track-a.json 里看不见 126 / 134 的原始拒因 —— 「被拒构建的报错会进 env」只在最高版本装不进
+ * 扩展的机器上成立。报告要展示环境矩阵就引用 --doctor-matrix 的产物 tmp/qa-e2e/chrome-matrix.json。
+ */
+export async function probeChromeBuildMatrix({
+  env = process.env,
+  base = CFT_DIR,
+  extDir,
+  probe = probeUnpackedSupport,
+} = {}) {
+  const pinned = env.E2E_CHROME ? path.resolve(env.E2E_CHROME) : null;
+  const cands = listChromeBuilds(base).map((b) => ({ ...b, source: "cft" }))
+    .concat(listPlaywrightBuilds(env).map((b) => ({ ...b, source: "playwright" })));
+  const matrix = [];
+  for (const b of cands) {
+    const r = await probe(b.exe, extDir);
+    matrix.push({
+      build: b.dir,
+      source: b.source,
+      version: b.version,
+      product: r.product || null,
+      ok: Boolean(r.ok),
+      error: r.ok ? null : (r.error || "unknown"),
+    });
+  }
+  const usable = matrix.filter((r) => r.ok);
+  return { pinned, probed: matrix.length, usable: usable.length, chosen: usable[0] || null, matrix };
+}
