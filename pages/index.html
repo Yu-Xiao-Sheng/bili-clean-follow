@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bili Clean Follow · 演示影片（1080p 直接播）</title>
+<meta name="description" content="Bili Clean Follow 的两支演示影片：产品介绍片与操作教程片，1080p 带音轨，浏览器里直接播放，不用下载。">
+<!--
+  FOR-66：这是 README 的"点开就能看完整版"落地页。
+  存在的理由（取证见 docs/video-hosting.md）：GitHub README 里 mp4 只会渲染成下载链接，
+  <video> 会被 sanitize 掉，YouTube 链接也不会内嵌播放器——README 首屏能自动播的只有 GIF。
+  所以完整 1080p 影片走这里：<video controls poster> + Range 请求 = 浏览器直接流式播放。
+  本页由 tools/publish_pages.py 组装（mp4 只进 Pages 产物，不进 main 的 git 历史）。
+  零外部依赖：不引 CDN、不引字体、不埋点——与产品"数据不出本机"的口径一致。
+-->
+<style>
+  :root {
+    --bg: #0d0f14; --panel: #141821; --line: #232a38;
+    --fg: #e8ecf4; --dim: #97a2b8; --accent: #55b8ff; --warm: #ffb86b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  }
+  header, main, footer { max-width: 1040px; margin: 0 auto; padding: 0 22px; }
+  header { padding: 34px 22px 8px; }
+  .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .brand h1 { font-size: 22px; margin: 0; letter-spacing: .01em; }
+  .brand .tag { color: var(--dim); font-size: 13px; }
+  nav { margin-top: 14px; display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .lede { color: var(--dim); margin: 14px 0 0; }
+  .film { margin: 34px 0; }
+  .film h2 { font-size: 18px; margin: 0 0 4px; }
+  .film .meta { color: var(--dim); font-size: 14px; margin: 0 0 14px; }
+  video {
+    display: block; width: 100%; aspect-ratio: 16 / 9; background: #000;
+    border: 1px solid var(--line); border-radius: 12px;
+  }
+  .links { margin: 12px 0 0; font-size: 14px; color: var(--dim); }
+  .links span { color: var(--line); margin: 0 8px; }
+  .note {
+    border: 1px solid var(--line); border-left: 3px solid var(--warm);
+    background: var(--panel); border-radius: 10px; padding: 14px 16px;
+    color: var(--dim); font-size: 14px; margin: 28px 0;
+  }
+  footer { padding: 28px 22px 46px; color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Bili Clean Follow · 演示影片</h1>
+    <span class="tag">1080p · 带音轨 · 浏览器直接播，不用下载</span>
+  </div>
+  <nav>
+    <a href="#promo">① 产品介绍片（58 秒）</a>
+    <a href="#walkthrough">② 操作教程片（62 秒）</a>
+    <a href="https://github.com/Yu-Xiao-Sheng/bili-clean-follow">回 README / 源码</a>
+    <a href="https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases">下载 Release 包</a>
+  </nav>
+  <p class="lede">
+    开源的 B站关注列表清理工具：给每个关注一个 keep / review / remove 分类和可解释的原因。
+    只在本地跑，cookie 与密钥不出本机。
+  </p>
+</header>
+
+<main>
+  <section class="film" id="promo">
+    <h2>① 产品介绍片 · 58 秒</h2>
+    <p class="meta">它解决什么问题、三支柱（安全 / 透明 / 轻量）、报告长什么样。</p>
+    <video controls preload="metadata" playsinline poster="poster-promo.jpg" src="bili-clean-promo.mp4">
+      你的浏览器不支持内嵌视频。可以
+      <a href="bili-clean-promo.mp4">点这里下载 mp4</a>，
+      或在 <a href="https://github.com/Yu-Xiao-Sheng/bili-clean-follow">README</a> 里看 GIF 预览。
+    </video>
+    <p class="links">
+      <a href="https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4">下载 1080p mp4</a>
+      <span>·</span> B 站 / YouTube 版待官方号上传后补链接
+    </p>
+  </section>
+
+  <section class="film" id="walkthrough">
+    <h2>② 操作教程片 · 62 秒</h2>
+    <p class="meta">从导出数据、装 CLI、跑分析，到 Markdown / CSV / 取关候选清单三种导出怎么看。</p>
+    <video controls preload="metadata" playsinline poster="poster-walkthrough.jpg" src="bili-clean-walkthrough.mp4">
+      你的浏览器不支持内嵌视频。可以
+      <a href="bili-clean-walkthrough.mp4">点这里下载 mp4</a>，
+      或在 <a href="https://github.com/Yu-Xiao-Sheng/bili-clean-follow">README</a> 里看 GIF 预览。
+    </video>
+    <p class="links">
+      <a href="https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4">下载 1080p mp4</a>
+      <span>·</span> B 站 / YouTube 版待官方号上传后补链接
+    </p>
+  </section>
+
+  <p class="note">
+    为什么要单独做这个页面：GitHub README 里 mp4 只会渲染成<strong>下载链接</strong>，
+    <code>&lt;video&gt;</code> 会被 sanitizer 清掉，YouTube 链接也不会内嵌播放器（实测取证见
+    <a href="https://github.com/Yu-Xiao-Sheng/bili-clean-follow/blob/main/docs/video-hosting.md">docs/video-hosting.md</a>）。
+    README 首屏放的是 GIF 预览，完整 1080p 在这里播。影片文件只放在 Pages 产物里，不进 main 的 git 历史。
+  </p>
+</main>
+
+<footer>
+  bili-clean-follow · MIT · 只读报告，从不调用取关接口（v1 口径；v2 插件形态的取关能力需显式武装）
+</footer>
+</body>
+</html>

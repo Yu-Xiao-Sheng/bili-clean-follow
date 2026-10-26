@@ -4,8 +4,18 @@
 
 一个开源工具：分析你的 B站关注列表，把每个关注按 **keep / review / remove** 分类，并给出可解释的原因——让你有把握地清理掉过期、不活跃或低价值关注。
 
-> 🎬 **两支 60 秒的片子**（1080p，带音轨）：[产品介绍片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4) · [使用教程片](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
->
+## 演示 · 打开这一页就能看见（两支 60 秒的片子，1080p 带音轨）
+
+![产品介绍片内联预览：58 秒讲清它是什么——打开本页就自动播，不用点、不用下载](assets/preview-promo.gif)
+
+**① 产品介绍片（58 秒）** — [▶ 在线观看（Pages 落地页，浏览器直接播）](https://yu-xiao-sheng.github.io/bili-clean-follow/#promo) · [下载 1080p mp4](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-promo.mp4)
+
+![操作教程片内联预览：从导出数据到看报告的完整流程，会自动循环播](assets/preview-walkthrough.gif)
+
+**② 操作教程片（62 秒）** — [▶ 在线观看（Pages 落地页，浏览器直接播）](https://yu-xiao-sheng.github.io/bili-clean-follow/#walkthrough) · [下载 1080p mp4](https://github.com/Yu-Xiao-Sheng/bili-clean-follow/releases/download/v0.1.2/bili-clean-walkthrough.mp4)
+
+> 上面两张是 **GIF 内联预览**：打开本页就会动。GitHub README 里放不下播放器（mp4 只渲染成下载链接，`<video>` 会被 sanitizer 清掉，YouTube 链接也不会内嵌播放器），所以完整 1080p 影片走 Pages 落地页直接播；B站 / YouTube 站内链接等官方号上传后补上。三条入口的分工、重跑脚本与上线步骤见 [docs/video-hosting.md](docs/video-hosting.md)。
+
 > ⚠️ **取关是真实写操作（v2 插件）· 默认关闭**：本工具默认只出报告。要真的取关，必须显式武装：
 > 侧栏「开启取关能力」开关 + 二次确认（写清调 `POST x/relation/delete`、速率、不可撤销）→
 > **先看到 diff 预览**（影响 N 人、按类分组、10 条样例）→ **手输 `UNFOLLOW`** 才会执行。
@@ -68,7 +78,7 @@ LLM function-calling 与本地语法双轨（没 Key 也能用），任何意图
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，248 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，256 项 pytest 全绿）。
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
@@ -179,10 +189,12 @@ extension/       # v2 Chrome 插件：Manifest V3 + 原生 ESM，零构建步骤
                  #   + intent(自然语言→意图 DSL) + preview(diff 预览与安全候选) + intentStack(回滚) + unfollow(七条护栏)
 tests/extension/ # 扩展离线单测（node:test，无需浏览器）
 tests/           # pytest 测试套件
-docs/            # spec.md, getting-started.md, scoring-model.md, extension-install.md
-PRIVACY.md       # v2 隐私口径：凭据永不出本机；昵称与简介只发给你自己指定的模型端点, extension-install.md
+assets/          # README 内联 GIF 预览 + 影片封面（tools/build_readme_preview.py 产出）
+pages/           # GitHub Pages 落地页源文件（<video controls poster> 播完整 1080p）
+docs/            # spec.md, getting-started.md, scoring-model.md, video-hosting.md, extension-install.md
 PRIVACY.md       # v2 隐私口径：凭据永不出本机；昵称与简介只发给你自己指定的模型端点
-.github/         # CI 工作流 + Issue/Discussion 模板
+tools/           # build_readme_preview.py, publish_pages.py, probe_web_render.py
+.github/         # CI 工作流（ci.yml, pages.yml）+ Issue/Discussion 模板
 pyproject.toml
 ```
 

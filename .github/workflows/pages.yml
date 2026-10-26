@@ -1,0 +1,97 @@
+# FOR-66：把 README 的"点开就能看完整版"落地页发到 GitHub Pages。
+#
+# 为什么需要这个 job：GitHub README 里 mp4 只会渲染成下载链接，<video> 会被 sanitizer
+# 清掉（取证见 docs/video-hosting.md §1）。完整 1080p 影片必须有个能真正播的页面。
+# 影片只从 Release 资源取，绝不进 main 的 git 历史（repo size 只有几百 KB）。
+#
+# 前置（需要 repo 管理员做一次）：Settings → Pages → Source 选 "GitHub Actions"。
+# 没开 Pages 时 deploy 会红——那是显式失败，不是静默空跑。
+name: pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "用哪个 Release 的影片资产（两支 mp4 目前在 v0.1.2 里）"
+        required: false
+        default: v0.1.2
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: assemble Pages site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Resolve the release tag carrying the films
+        id: tag
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          if [ "$EVENT" = "release" ]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${INPUT_TAG:-v0.1.2}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the films from Release assets (never commit them to main)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p promo/out
+          if ! gh release download "${{ steps.tag.outputs.tag }}" -R "$GITHUB_REPOSITORY" -p '*.mp4' -D promo/out; then
+            echo "Release ${{ steps.tag.outputs.tag }} 里没有 *.mp4 影片资产；用 workflow_dispatch 的 tag 参数指定带影片的 Release。"
+            exit 1
+          fi
+          ls -l promo/out
+
+      - name: Assemble the site and self-check streaming (Range / 206 / Content-Range)
+        run: |
+          python tools/publish_pages.py --out dist/pages --self-check
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout (for the post-deploy probe)
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # 线上取证：页面在、mp4 可分段取——这是"浏览器里能直接播、能拖进度条"的机器证据。
+      - name: Verify the deployed page actually streams the films
+        run: |
+          python tools/publish_pages.py --check-url "${{ steps.deployment.outputs.page_url }}"
