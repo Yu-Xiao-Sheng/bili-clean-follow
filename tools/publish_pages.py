@@ -31,6 +31,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -44,6 +45,7 @@ FILMS = [
     ("promo", "bili-clean-promo.mp4"),
     ("walkthrough", "bili-clean-walkthrough.mp4"),
 ]
+UA = "bili-clean-follow-pages"
 PAGES_SOURCE = REPO_ROOT / "pages" / "index.html"
 ASSETS = REPO_ROOT / "assets"
 
@@ -177,35 +179,49 @@ def serve(out_dir: Path, port: int) -> None:
 
 
 def check_url(base: str) -> int:
-    # FOR-66：取证输出走 UTF-8，GBK 控制台下也不花屏（被直接 import 调用时同样要兜）。
+    """线上取证：页面在、影片可流式（Accept-Ranges + 206 + Content-Range）。
+
+    坏法之一是「页面或影片直接 404」（Pages 开关没开、部署失败、影片没进产物）。
+    这类必须落成 FAIL 行 + 退出码 1，而不是把 urllib 的栈糊进日志：FOR-67 的 C 轨上线取证
+    与 pages.yml 部署后的 --check-url 都要读这份输出，一条栈会让人以为工具坏了。
+    """
     harden_stdio()
-    """线上取证：页面在、影片可流式（Accept-Ranges + 206 + Content-Range）。"""
     base = base.rstrip("/") + "/"
     problems = []
-    with urllib.request.urlopen(base, timeout=30) as resp:
-        html = resp.read().decode("utf-8", "replace")
-        if resp.status != 200:
-            problems.append("index.html HTTP %s" % resp.status)
-        for needle in ("<video", "controls", "poster=", ".mp4"):
-            if needle not in html:
-                problems.append("落地页 HTML 里缺 %r" % needle)
+    try:
+        with urllib.request.urlopen(base, timeout=30) as resp:
+            html = resp.read().decode("utf-8", "replace")
+            if resp.status != 200:
+                problems.append("index.html HTTP %s" % resp.status)
+            for needle in ("<video", "controls", "poster=", ".mp4"):
+                if needle not in html:
+                    problems.append("落地页 HTML 里缺 %r" % needle)
+    except urllib.error.HTTPError as exc:
+        problems.append("index.html HTTP %s（Pages 未上线或部署失败）" % exc.code)
+    except urllib.error.URLError as exc:
+        problems.append("index.html 连不上：%s" % exc.reason)
     for _, name in FILMS:
         url = base + name
-        req = urllib.request.Request(url, method="HEAD",
-                                     headers={"User-Agent": "bili-clean-follow-pages"})
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            if resp.headers.get("Accept-Ranges", "").lower() != "bytes":
-                problems.append("%s 没有 Accept-Ranges: bytes（浏览器无法边下边播/拖动）" % name)
-        req = urllib.request.Request(url, headers={"Range": "bytes=0-1023",
-                                                  "User-Agent": "bili-clean-follow-pages"})
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            if resp.status != 206:
-                problems.append("%s 分段请求返回 %s，不是 206" % (name, resp.status))
-            crange = resp.headers.get("Content-Range", "")
-            if not crange.startswith("bytes 0-1023/"):
-                problems.append("%s 的 Content-Range 不对：%r" % (name, crange))
-            if len(resp.read()) != 1024:
-                problems.append("%s 分段响应长度不是 1024" % name)
+        head = urllib.request.Request(url, method="HEAD",
+                                      headers={"User-Agent": UA})
+        rng = urllib.request.Request(url, headers={"Range": "bytes=0-1023",
+                                                   "User-Agent": UA})
+        try:
+            with urllib.request.urlopen(head, timeout=60) as resp:
+                if resp.headers.get("Accept-Ranges", "").lower() != "bytes":
+                    problems.append("%s 没有 Accept-Ranges: bytes（浏览器无法边下边播/拖动）" % name)
+            with urllib.request.urlopen(rng, timeout=60) as resp:
+                if resp.status != 206:
+                    problems.append("%s 分段请求返回 %s，不是 206" % (name, resp.status))
+                crange = resp.headers.get("Content-Range", "")
+                if not crange.startswith("bytes 0-1023/"):
+                    problems.append("%s 的 Content-Range 不对：%r" % (name, crange))
+                if len(resp.read()) != 1024:
+                    problems.append("%s 分段响应长度不是 1024" % name)
+        except urllib.error.HTTPError as exc:
+            problems.append("%s HTTP %s（影片没进 Pages 产物或路径不对）" % (name, exc.code))
+        except urllib.error.URLError as exc:
+            problems.append("%s 连不上：%s" % (name, exc.reason))
     for p in problems:
         print("FAIL  %s" % p)
     print("OK    落地页与两支影片可流式播放" if not problems else "落地页取证未通过")

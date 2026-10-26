@@ -83,7 +83,7 @@ LLM function-calling 与本地语法双轨（没 Key 也能用），任何意图
 
 ## 快速开始
 
-前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，260 项 pytest 全绿）。
+前置：Python 3.9+（CI 覆盖 3.9–3.13，另有一个 Windows GBK 冒烟 job 与一个「真实 chromium 渲染 Web 报告」的 DOM 门禁 job；本轮实测 Python 3.13.15，262 项 pytest 全绿）。igin/promo/for-66-readme-video
 以下命令 Windows / macOS / Linux 通用，建议在一个干净的虚拟环境里跑。
 
 **第 1 步 · 先安装（必须，二选一）**
