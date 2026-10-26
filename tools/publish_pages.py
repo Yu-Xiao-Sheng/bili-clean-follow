@@ -7,6 +7,11 @@
 关键约束：mp4 绝不进 main 的 git 历史（repo size 只有几百 KB）。所以影片只作为
 Pages 产物存在——由本脚本从 promo/out/ 或 Release 资源组装，落到 dist/（已 gitignore）。
 
+Windows 中文控制台（GBK/cp936）下也能直接读：入口与 check_url 都走
+bili.streams.harden_stdio()（与 CLI / Web / 取证脚本同一份兜底，FOR-38 口径）。
+实测 PYTHONIOENCODING=gbk 跑这条取证，中文提示会输出成 cp936 字节，管道按 UTF-8 读
+就是一片花屏（FOR-66 复核时踩过），CI 只跑 ubuntu 抓不到这个环境。
+
 用法：
     python tools/publish_pages.py                          # 组装 dist/pages（影片取 promo/out/）
     python tools/publish_pages.py --from-release v0.1.2     # 没有本地影片时从 Release 下载
@@ -30,6 +35,9 @@ import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from bili.streams import harden_stdio  # noqa: E402  # 与 CLI/Web 同一份 stdout 兜底（FOR-38）
 
 # slug -> Pages 产物里的影片文件名（与 pages/index.html 里的 src 一致）。
 FILMS = [
@@ -169,6 +177,8 @@ def serve(out_dir: Path, port: int) -> None:
 
 
 def check_url(base: str) -> int:
+    # FOR-66：取证输出走 UTF-8，GBK 控制台下也不花屏（被直接 import 调用时同样要兜）。
+    harden_stdio()
     """线上取证：页面在、影片可流式（Accept-Ranges + 206 + Content-Range）。"""
     base = base.rstrip("/") + "/"
     problems = []
@@ -237,6 +247,7 @@ def push_branch(out_dir: Path, remote: str, branch: str) -> int:
 
 
 def main(argv: list) -> int:
+    harden_stdio()
     ap = argparse.ArgumentParser(description="组装 / 发布 / 验证 Pages 落地页")
     ap.add_argument("--out", default=str(REPO_ROOT / "dist" / "pages"))
     ap.add_argument("--video-dir", default=str(REPO_ROOT / "promo" / "out"))
