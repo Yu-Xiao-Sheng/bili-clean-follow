@@ -24,6 +24,11 @@ import { LOW_CONFIDENCE, UNSURE_CATEGORY, defaultTaxonomy } from "../../extensio
 import { parseIntentLocal } from "../../extension/intent.js";
 import { CHECKPOINT_KEY, buildResumePreview } from "../../extension/unfollow.js";
 import { createStore, memoryStorage } from "../../extension/store.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { normalizeFollowItem } from "../../extension/biliApi.js";
+import { classifyLocalBatch } from "../../extension/classifyLocal.js";
 
 const TAX = defaultTaxonomy();
 
@@ -175,3 +180,46 @@ test("断点续跑的预览只给剩下的人，指纹与原预览不同（不�
   assert.ok(!risky.preview.items.some((i) => i.mid === "22009"));
   assert.ok(createStore);
 });
+
+// --- 交付口径追加验收（CEO 在 FOR-64 收口后钉的）：交付报告必须给两个数 ——
+// 「待确认条目数」与「实际进入 diff 的条目数」。这里把它钉成可复算的断言，
+// 夹具与 Python 侧「真实接口形状」同一份（tests/fixture-bili-real-list.json，20 条真实形状数据），
+// 分类走离线规则（确定性、零外发），所以任何人 checkout 后都能把这两个数复算出来。
+test("真实形状夹具上的两个数：待确认 6 条被挡在外面，真正进入取关 diff 的是 8 条", () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const fixture = JSON.parse(fs.readFileSync(path.join(here, "..", "fixture-bili-real-list.json"), "utf8"));
+  const items = fixture.data.list.map((row) => normalizeFollowItem(row)).filter(Boolean);
+  assert.equal(items.length, 20, "夹具必须是 20 条，否则这两个数没有意义");
+  const results = classifyLocalBatch(items, TAX, { now: Date.UTC(2026, 9, 26) });
+  const unsure = results.filter((r) => r.category === UNSURE_CATEGORY).length;
+  assert.equal(unsure, 6, "待确认条目数（证据不足 -> unsure）");
+
+  // 最激进的情形：把所有非「待确认」的类统统勾成「进候选」
+  const decisions = {};
+  for (const row of categorySummary(results, TAX)) {
+    if (!row.isUnsure) decisions[row.categoryId] = DECISION.CANDIDATE;
+  }
+  const preview = buildUnfollowPreview({ items, results, decisions, taxonomy: TAX, selfMid: "0" });
+  assert.equal(preview.affected, 8, "实际进入取关 diff 的条目数");
+  assert.equal(preview.excluded.unsure, unsure, "待确认一条都不许进 diff（CEO 追加口径）");
+  assert.equal(preview.excluded.lowConfidence, 6, "离线规则只给 0.2 的类同样被置信闸（0.55）挡掉");
+  assert.equal(preview.excluded.keep, 0);
+  assert.equal(preview.excluded.notOptedIn, 0);
+  assert.equal(preview.affected + preview.excluded.unsure + preview.excluded.lowConfidence +
+    preview.excluded.keep + preview.excluded.notOptedIn + preview.excluded.uncategorized, 20,
+    "进入 + 被挡 = 全量：谁不会被取关，必须能对账");
+  assert.ok(preview.samples.length <= 10, "样例最多 10 条（验收 2）");
+
+  // 一个类都没表态时 diff 必须是空的：不表态 != 默认交出来
+  assert.equal(buildUnfollowPreview({ items, results, decisions: {}, taxonomy: TAX, selfMid: "0" }).affected, 0);
+  // 全部勾「保留」时也是空的（白名单硬约束，护栏 e）
+  const allKeep = {};
+  for (const row of categorySummary(results, TAX)) {
+    if (!row.isUnsure) allKeep[row.categoryId] = DECISION.KEEP; // 连「进候选」都没勾的类也一并勾保留
+  }
+  const kept = buildUnfollowPreview({ items, results, decisions: allKeep, taxonomy: TAX, selfMid: "0" });
+  assert.equal(kept.affected, 0);
+  assert.equal(kept.excluded.keep, 14, "20 - 6 待确认 = 14 人全部落在 keep 白名单里（护栏 e）");
+  assert.equal(kept.excluded.unsure, 6, "待确认即使没被勾保留，也照样进不了 diff");
+});
+
