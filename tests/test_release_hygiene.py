@@ -360,3 +360,64 @@ def test_qa_evidence_scan_items_snapshot_matches_the_report():
     assert per_cat == expected, (
         "逐条快照的类目分布与报告 cls.counts 不一致：快照 %s != 报告 %s"
         % (per_cat, expected))
+
+# --- FOR-67：门禁必须真的被触发（写了 job 但没人跑 = 没有门禁） --------------
+# 本轮匿名取证的实况：GET /repos/Yu-Xiao-Sheng/bili-clean-follow/actions/runs 拿到 20 条 run，
+# 全部来自 main 或 pull_request，取证分支 integration/for-67-v2-tree 上 **0 条**。原因是 ci.yml
+# 的 on: 只写 branches: [main]：于是 track-a（A 轨真机）、e2e-fixture、release-gate 这三条为 v2
+# 取证新加的 job 一次都没跑过。上一轮「CI 的 release-gate 不会再假性红」就是这么得出的假结论。
+CI_YML = ".github/workflows/ci.yml"
+CI_EVIDENCE_BRANCH = "integration/*"
+# A 轨靠浏览器级 CDP 的 Extensions.loadUnpacked，代码里用的是 Node 全局 WebSocket。
+# Node 20 官方文档把它标成 Stability: 1 - Experimental（要 --experimental-websocket），
+# 21+ 才默认存在 —— 之前 setup-node 钉的是 20，所以 track-a 就算被触发也会当场红。
+CI_NODE_MIN = 21
+
+
+def _ci_block(text, first_line):
+    """取 workflow 里某个块（on: 或某个 job）的正文，**丢掉注释行**。
+
+    丢注释不是洁癖：第一次突变验证时 on: 块的注释里正好写着 integration/*，
+    断言照样绿 —— 注释把门禁糊过去了。所以只认非注释行。
+    """
+    lines = text.splitlines()
+    if first_line not in lines:
+        raise AssertionError("%s 里找不到 %r 这一行" % (CI_YML, first_line))
+    body = []
+    for line in lines[lines.index(first_line) + 1:]:
+        if line and not line.startswith((" ", "#")):
+            break
+        if line.strip() and not line.lstrip().startswith("#"):
+            body.append(line.strip())
+    return body
+
+
+def test_ci_triggers_on_the_evidence_tree():
+    """A/B/C 三轨取证跑在 integration/* 上；这棵树不触发 CI，取证就只活在某台本机。"""
+    on_block = _ci_block(_read(CI_YML), "on:")
+    branch_lines = [ln for ln in on_block if ln.startswith("branches:")]
+    assert branch_lines, "%s 的 on.push 里没有 branches: —— 那 CI 只在默认分支上跑" % CI_YML
+    assert any(CI_EVIDENCE_BRANCH in ln for ln in branch_lines), (
+        "%s 的 on.push.branches（%s）里没有 %s：取证树上的 job 永远不会跑，"
+        "「CI 有 A 轨门禁」就是假话。" % (CI_YML, " | ".join(branch_lines), CI_EVIDENCE_BRANCH))
+    dispatch = [ln for ln in on_block if ln.startswith("workflow_dispatch")]
+    assert len(dispatch) == 1, (
+        "%s 的 on: 里 workflow_dispatch 出现 %d 次：同名键重复会让整个 workflow 解析失败，"
+        "所有 job 一起消失。" % (CI_YML, len(dispatch)))
+
+
+def test_ci_runs_track_a_on_a_node_with_global_websocket():
+    """A 轨 job 必须在位、必须真装浏览器、Node 版本必须有全局 WebSocket。"""
+    text = _read(CI_YML)
+    body = "\n".join(_ci_block(text, "  track-a:"))
+    for needle in ("track_a_extension_e2e.mjs", "--doctor-matrix", "install --with-deps chromium"):
+        assert needle in body, (
+            "track-a job 里少了 %s：A 轨真机取证（含环境矩阵）不会真的执行。" % needle)
+    versions = [int(m.group(1)) for m in
+                re.finditer(r'(?m)^\s*node-version:\s*"?(\d+)', text)];
+    assert versions, "%s 里没有任何 node-version" % CI_YML
+    stale = sorted({v for v in versions if v < CI_NODE_MIN})
+    assert not stale, (
+        "%s 用 Node %s 跑 node 侧 job：Node 20 的全局 WebSocket 是 Experimental，"
+        "A 轨的 CDP 调用会当场摔成 WebSocket is not defined。最低要 %d。"
+        % (CI_YML, ",".join(str(v) for v in stale), CI_NODE_MIN))

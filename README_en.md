@@ -58,7 +58,7 @@ to unfollow.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 263 tests green).igin/promo/for-66-readme-video
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 265 tests green).igin/promo/for-66-readme-video
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 

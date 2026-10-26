@@ -26,7 +26,13 @@ import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
 import { SELF_MID, buildPages, resolverArgs, startMockServer, uniqueMids } from "./mock_bilibili.mjs";
-import { CFT_DIR, listChromeBuilds, probeChromeBuildMatrix, selectChromeForExtensionTest } from "./chrome_choice.mjs";
+import {
+  CFT_DIR,
+  listChromeBuilds,
+  probeChromeBuildMatrix,
+  requireWebSocketGlobal,
+  selectChromeForExtensionTest,
+} from "./chrome_choice.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const EXT = path.join(ROOT, "extension");
@@ -52,6 +58,7 @@ function chromeChoice() {
 
 /** CDP Extensions.loadUnpacked：Chrome 127+ 里唯一可靠的未打包扩展装载方式。 */
 async function loadUnpackedViaCdp(port, extDir) {
+  requireWebSocketGlobal();
   let wsUrl = null;
   for (let i = 0; i < 80 && !wsUrl; i++) {
     await new Promise((r) => setTimeout(r, 250));

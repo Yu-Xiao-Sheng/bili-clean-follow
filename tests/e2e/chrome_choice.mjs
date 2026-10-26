@@ -80,6 +80,23 @@ export function listPlaywrightBuilds(env = process.env) {
   return out;
 }
 
+/**
+ * 全局 WebSocket 的前置检查。
+ * 为什么单独钉它（本轮实测口径）：A 轨靠浏览器级 CDP 的 Extensions.loadUnpacked，而这条调用
+ * 用的是 Node 的全局 WebSocket。Node 20 的官方文档把 WebSocket 标成 Stability: 1 - Experimental，
+ * 必须加 --experimental-websocket 才存在；而 ci.yml 里 setup-node 之前钉的是 20 —— 也就是说
+ * track-a job 就算被触发也会摔成 "WebSocket is not defined"，取证日志看不出根因。
+ * 缺了它就直接失败并把 Node 版本号写进报错，而不是留一句 ReferenceError 给下一轮排查。
+ */
+export function requireWebSocketGlobal(version = process.version) {
+  if (typeof globalThis.WebSocket !== "function") {
+    const e = new Error("当前 Node " + version + " 没有全局 WebSocket，A 轨的浏览器级 CDP 跑不了："
+      + "用 Node 21+（CI 里是 22），或给 Node 20 加 --experimental-websocket。");
+    e.code = "WEBSOCKET_GLOBAL_MISSING";
+    throw e;
+  }
+}
+
 async function waitForCdp(port, { tries = 80, delay = 250 } = {}) {
   for (let i = 0; i < tries; i++) {
     await new Promise((r) => setTimeout(r, delay));
@@ -122,6 +139,7 @@ let probePortSeq = Number(process.env.E2E_PROBE_PORT || 9520);
  * 返回 {ok, product, extensionId, error}；不抛异常 —— 探针失败是数据，不是事故。
  */
 export async function probeUnpackedSupport(exe, extDir) {
+  requireWebSocketGlobal();
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "bcf-probe-"));
   const port = probePortSeq++;
   const proc = spawn(exe, [

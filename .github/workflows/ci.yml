@@ -2,7 +2,11 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    # integration/* 是 FOR-67 三轨取证的统一取证树。只写 main 的后果本轮实测过：
+    # 匿名 GET /repos/.../actions/runs 里 20 条 run 全部来自 main 或 pull_request，
+    # integration/for-67-v2-tree 上 0 条 —— 为 v2 新加的 track-a / e2e-fixture / release-gate
+    # 一次都没跑过，「CI 里有 A 轨门禁」当时是假话。门禁不跑 == 没有门禁。
+    branches: [main, "integration/*"]
   pull_request:
   # 分支还没合进 main 时也要能跑全套门禁：FOR-66 那张「分支怎么进 main」的卡还没答，
   # 但取证不该因此等下去 —— 在 Actions 里对任意分支 Run workflow 就能拿到 CI 证据。
@@ -130,7 +134,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"  # A 轨用全局 WebSocket：Node 20 还是 Experimental（要 --experimental-websocket）
 
       - name: Zero-build gate (no dependency manifest, no node_modules)
         run: |
@@ -158,7 +162,7 @@ jobs:
       - name: Set up Node
         uses: "actions/setup-node@v4"
         with:
-          node-version: "20"
+          node-version: "22"  # A 轨用全局 WebSocket：Node 20 还是 Experimental（要 --experimental-websocket）
 
       - name: Packaging gate must refuse while the report is missing
         run: |
@@ -185,7 +189,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"  # A 轨用全局 WebSocket：Node 20 还是 Experimental（要 --experimental-websocket）
 
       - name: Install harness deps (tests/e2e only; extension/ stays dependency-free)
         run: npm ci --prefix tests/e2e
@@ -211,7 +215,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"  # A 轨用全局 WebSocket：Node 20 还是 Experimental（要 --experimental-websocket）
 
       - name: Install harness deps (tests/e2e only; extension/ stays dependency-free)
         run: npm ci --prefix tests/e2e
