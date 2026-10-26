@@ -4,6 +4,11 @@
 
 一个开源工具：分析你的 B站关注列表，把每个关注按 **keep / review / remove** 分类，并给出可解释的原因——让你有把握地清理掉过期、不活跃或低价值关注。
 
+> **主形态已换成浏览器插件（v2）**：4 步装好、不用装 Python，图文教程见 [docs/extension-install.md](docs/extension-install.md)；
+> 不便装扩展的用户可用**只读**油猴脚本 [userscripts/bili-clean.user.js](userscripts/bili-clean.user.js)（读全 + 离线分类 + 候选清单，不含取关）。
+> `bili-clean-follow-v2.0.0-extension.zip` 要等 FOR-67 的三轨取证报告判 Go 之后才随 Release 提供（`tools/package_release.mjs` 会拦住打包与打 tag）；
+> 现在要用就取仓库里的 `extension/` 目录 Load unpacked。**Python CLI 已进维护模式：冻结在 v0.1.3，只做安全修复。**
+
 ## 演示 · 打开这一页就能看见（两支 60 秒的片子，1080p 带音轨）
 
 ![产品介绍片内联预览：58 秒讲清它是什么——打开本页就自动播，不用点、不用下载](assets/preview-promo.gif)
@@ -143,7 +148,7 @@ python -m bili.web --input sample-follows.json
 
 ## 插件预览版怎么装（v2 进行中）
 
-> ⚠️ v2 还在开发：插件已经能做「读全关注列表 + 分类（离线规则 / 你自带 Key 的模型）+ 本地只读报告 + 一句中文整理（自然语言指令 → diff 预览 → 回滚）」；取关是**真实写操作，默认关闭**，要开关 + 二次确认 + 看过预览 + 手输 `UNFOLLOW` 才会执行（护栏见上一节）。想现在就用打分式分析，走上面的 CLI「快速开始」——按 v2 方案，CLI 已进维护模式（只修安全问题，不再加功能）。
+> ⚠️ v2 还在开发：插件已经能做「读全关注列表 + 分类（离线规则 / 你自带 Key 的模型）+ 本地只读报告 + 一句中文整理（自然语言指令 → diff 预览 → 回滚）」；取关是**真实写操作，默认关闭**，要开关 + 二次确认 + 看过预览 + 手输 `UNFOLLOW` 才会执行（护栏见上一节）。想现在就用打分式分析，走上面的 CLI「快速开始」——按 v2 方案 **CLI 已进维护模式：冻结在 v0.1.3，只做安全修复，不再加功能**（v2 的主实现是上面的插件）。
 
 四步装好，全程不用 clone、不用 pip、不用 npm：
 
@@ -164,7 +169,7 @@ python -m bili.web --input sample-follows.json
 - **外发先告知**：首次启用 AI 会逐条列出「将发送 N 条昵称 + 简介到 <你填的端点>」，可改成只发昵称；载荷里没有 Cookie / UID / mid / 头像 / 关注关系，只带一次性代号 r1、r2…；换端点必须重新确认，随时可「撤回外发确认」。安装时不预授第三方权限，确认端点时才申请那一个 origin。
 - **凭据不出本机**：Cookie 与 Key 不进仓库、不进日志、不进导出文件（Key 只待在 `chrome.storage.local` 的独立键里）；没有我们的服务器，也没有遥测中转。完整口径见 [PRIVACY.md](PRIVACY.md)。
 
-图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（150 项 node:test 用例，CI 已钉成门禁；其中 62 项是 FOR-65 的：意图 DSL、diff 预览、七条护栏逐条拒、操作栈回滚、写操作边界，以及「一句话指令 → 预览 → 武装 → 取关 → 回滚」的端到端 mock 串跑）。
+图文步骤与常见问题见 [docs/extension-install.md](docs/extension-install.md)。扩展侧的离线单测不需要浏览器也不需要登录：`node --test "tests/extension/*.test.mjs"`（175 项 node:test 用例，CI 已钉成门禁；其中 62 项是 FOR-65 的：意图 DSL、diff 预览、七条护栏逐条拒、操作栈回滚、写操作边界，以及「一句话指令 → 预览 → 武装 → 取关 → 回滚」的端到端 mock 串跑；另有 FOR-68 的 25 项：油猴脚本只读护栏 14 项 + v2.0.0 发布门禁 9 项 + 交付物清单核对（含「报告 Go 之前不许挂 v2.0.0 下载链接」）2 项——报告没 Go 就打包不出 zip，也打不出 tag）。
 
 
 ## 如何得分

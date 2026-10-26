@@ -1,8 +1,13 @@
-# 插件安装与使用（v2 预览版，进行中）
+# 插件安装与使用（v2.0.0 交付口径 · FOR-68）
 
-> 对应工单 FOR-63 + FOR-64 + FOR-65。现在能做：抓全关注列表 → 分类（离线规则 / 你自带 Key 的模型端点）→ 只读报告
-> → 一句中文整理（意图 DSL + diff 预览 + 回滚）→ 可选的取关（写操作，默认关闭，七条护栏）。
-> 状态口径以 FOR-62 的 v2-spec 为准；插件是 v2 的主实现，Python CLI 进维护模式。
+> 这是 v2 的**主形态**：Chrome / Edge 扩展，零构建、零 `node_modules`，`Load unpacked` 直接可用。
+> 能做：抓全关注列表 → 分类（离线规则 / 你自带 Key 的模型端点）→ 只读报告 → 一句中文整理
+> （意图 DSL + diff 预览 + 回滚）→ 可选的取关（**真实写操作，默认关闭**，七条护栏）。
+> 状态口径以 FOR-62 的 v2-spec 为准；Python CLI 已进维护模式（冻结 v0.1.3，只做安全修复）。
+>
+> **关于产物**：`bili-clean-follow-v2.0.0-extension.zip` 要等 FOR-67 的三轨取证报告落地并判 Go 才会随 Release 发布
+> （口径：没有测试报告就没有 release —— `tools/package_release.mjs` 会当场拦住打包与打 tag）。
+> **在那之前想用就取仓库里的 `extension/` 目录 Load unpacked**，功能完全一样。
 
 ## 1. 装（4 步，零依赖）
 
@@ -14,6 +19,42 @@
 4. 浏览器里先登录 bilibili.com（必需：`x/relation/followings` 在未登录时返回 `code=-101 账号未登录`，这是本轮实测结论）。
 
 Edge 同理：`edge://extensions` → 开发者模式 → 加载未打包的扩展。
+
+### 装的时候长什么样（截图清单，FOR-68 交付物 3）
+
+> 纪律：截图只准来自真实界面，**不用手绘示意图冒充截图**。前三条 `chrome://` 镜头浏览器不允许自动化
+> （Playwright / CDP 都驱动不了 `chrome://extensions`），只能人工补拍；后两条由 FOR-70 的取证脚本
+> `promo/tools/capture_ui.mjs` 从真实 `extension/sidepanel.html` 渲染产出，而它硬读 `docs/qa-report-v2.json`
+> （报告没落地就退出码 1），所以这两张跟 Release 一起出。
+
+| 步骤 | 素材路径 | 现在状态 |
+|---|---|---|
+| ① `chrome://extensions` 打开「开发者模式」 | `assets/install/step1-dev-mode.png` | 待人工补拍（`chrome://` 不可自动化） |
+| ② 「加载已解压的扩展程序」选中 `extension/` 目录本身 | `assets/install/step2-load-unpacked.png` | 待人工补拍（同上） |
+| ③ 工具栏图标 →「分析我的关注列表」打开侧栏 | `assets/install/step3-sidepanel-open.png` | 待人工补拍 |
+| ④ 抓取进度与「已取 / total / 页数」 | `assets/install/step4-progress.png` | 待 `promo/tools/capture_ui.mjs` 产出（依赖取证报告） |
+| ⑤ 分类结果卡片 + 「保留 / 进候选」 | `assets/install/step5-categories.png` | 同上 |
+
+4 步文字版就是上一节，缺图不影响照做；图补齐之前**不要**拿示意图冒充这些文件名。
+
+## 1.5 不想装扩展：油猴脚本（只读版）
+
+`userscripts/bili-clean.user.js`。装 Tampermonkey / Violentmonkey → 新建脚本 → 整份粘贴保存 →
+打开 `https://space.bilibili.com/<你的 mid>/relation/follow`，右下角出现「Bili Clean Follow · 只读分析」面板，
+点「读全关注列表」即可；没读全之前导出按钮是灰的（跟插件同一个门禁）。
+
+| 能力 | 插件 | 油猴脚本 |
+|---|---|---|
+| 读全关注列表（`fetched >= total` 才算读全） | ✅ | ✅（同样 20 条一页、mid 去重、450ms + jitter 自我限速） |
+| 离线规则分类（12 类 + 其他 + 待确认，置信封顶 0.68） | ✅ | ✅（关键词表与 `extension/taxonomy.js` 同一份，测试钉住不漂移） |
+| 导出 CSV（带 UTF-8 BOM）/ `to-unfollow.txt` / Markdown 报告 | ✅ | ✅ |
+| AI 分类（BYOK） | ✅ | ❌（油猴版零第三方外发，也就没有「外发确认」） |
+| 取关执行 / diff 预览 / 审计 / 断点续抓 | ✅（默认关闭，七条护栏） | ❌ **只读**：写接口连进请求构造器的资格都没有 |
+| 关注页 DOM 兜底（接口被风控时） | ✅ | ✅（同一套选择器） |
+
+「只读」是可核对的而不是口号：`tests/extension/userscript_readonly.test.mjs` 断言写接口字符串只准出现在禁用清单里、
+全脚本只有一处 `fetch`、`@grant none` 且不用 `GM_xmlhttpRequest` / `unsafeWindow` / `document.cookie`、
+只读常量（分页粒度 / 限速下限 / 2000 上限 / 置信阈值）与插件同源。
 
 ## 2. 用
 
@@ -95,7 +136,7 @@ node --version          # 需要 Node 20+
 node --test "tests/extension/*.test.mjs"
 ```
 
-覆盖（150 项）：分页合并与 mid 去重、`fetched == total` 读全门禁、`incomplete` 断点与续抓、
+覆盖（175 项）：分页合并与 mid 去重、`fetched == total` 读全门禁、`incomplete` 断点与续抓、
 错误语义映射（0 / -101 / -352 / 412）、导出格式与 CLI 常量交叉比对、凭据不落盘不外泄、
 manifest 权限最小集与「extension/ 无构建产物」；以及 FOR-64 的：12 类体系与增删改名、
 离线分类在真实形状 fixture 上的结果与「零外发」断言、BYOK 每批 40 条 + JSON schema +
@@ -110,3 +151,8 @@ diff 预览（条数 / 分组 / 10 条样例 / 被挡计数 / 指纹与 TTL）�
 `privacy.js`（凭据边界）、`sidepanel.*`、`popup.*`、`content/followpage.js`（关注页内联按钮 + DOM 兜底）；
 分类三件套：`taxonomy.js`（12 类 + 可编辑 + 稳定 id）、`classifyLocal.js`（离线规则，零网络）、
 `classifyLlm.js`（BYOK，OpenAI 兼容）、`classify.js`（读全门禁 + 结果落库 + 保留/进候选决策）。
+
+发布与打包（FOR-68）：`node tools/package_release.mjs --check` 只验门禁，`node tools/package_release.mjs` 过门禁后产出
+`dist/bili-clean-follow-<version>-extension.zip`（并打印 sha256）。现在跑必然退出码 1：`docs/qa-report-v2.md` 还没落地。
+新增的 25 项里有 14 项是油猴脚本的只读护栏（写接口只准出现在禁用清单、只有一处 fetch、`@grant none`），
+9 项是发布门禁自己（缺报告拦、No-Go 退出码 2、json 对账、B 轨不是 real 拦、zip 可复现与自检），2 项核对 FOR-68 六条交付物在位与「报告 Go 之前不许挂 v2.0.0 下载链接」。
