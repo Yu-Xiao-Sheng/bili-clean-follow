@@ -238,7 +238,7 @@ export async function snapshot() {
 
 /** 登录态：nav 给 code=-101 就是没登录，直接 incomplete，不重试（实测匿名 -101）。 */
 async function resolveSelf() {
-  const r = await fetchJsonSw(ENDPOINTS.nav);
+  const r = await swFetchJson(ENDPOINTS.nav);
   const parsed = parseNavPayload(r.payload, { httpStatus: r.httpStatus, rawText: r.rawText });
   if (!parsed.login) {
     return { ok: false, mid: null, kind: parsed.kind, message: parsed.message || KIND_LABEL_ZH[parsed.kind] };

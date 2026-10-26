@@ -72,8 +72,12 @@ export async function startMockServer({ pages, total = null, riskOnPage = null }
     const pn = url.searchParams.has("pn") ? Number(url.searchParams.get("pn")) : null;
     requests.push({ path: url.pathname, pn, at: Date.now() });
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Access-Control-Allow-Origin", "*");
+    // 扩展的 SW fetch 带 credentials:"include"，Access-Control-Allow-Origin 给 * 会被浏览器挡掉，
+    // 必须回显请求的 Origin（取证时 A 轨会因此一条都抓不到，别退回 *）。
+    res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
     res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Headers", "content-type, accept");
+    res.setHeader("Vary", "Origin");
 
     let body;
     if (url.pathname === "/x/web-interface/nav") {

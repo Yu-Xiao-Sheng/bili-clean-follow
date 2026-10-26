@@ -9,7 +9,7 @@ Chrome Web Store 与 Edge Add-ons 用同一份材料与同一份代码：`extens
 | # | 前置 | 状态 | 备注 |
 |---|---|---|---|
 | 1 | `docs/qa-report-v2.md` 判 Go | ❌ 等 FOR-67 | 硬门禁：报告缺失或 No-Go 时不得打包 / 打 tag（`tools/package_release.mjs` 退出码 1） |
-| 2 | `extension/manifest.json` 版本号改成 `2.0.0`（去掉 `-alpha.3`） | ❌ 等发布动作 | 门禁会拒正式版号以外的版本，见 `checkManifest` |
+| 2 | `extension/manifest.json` 版本号改成 `2.0.0`（现在是预览构建号 `2.0.0.3`） | ❌ 等发布动作 | 门禁会拒正式版号以外的版本，见 `checkManifest` |
 | 3 | Edge 开发者后台账号（微软账号 + 开发者协议） | ❌ 需人工 | 一次性，约 $10 注册费 |
 | 4 | 隐私政策公开 URL | ✅ 仓库里已有 | `https://github.com/Yu-Xiao-Sheng/bili-clean-follow/blob/main/PRIVACY.md` |
 | 5 | 商店图标 3 档（48 / 128 / 高解析 1024 或 3000x400 横幅） | ⚠️ 素材在仓库，需按商店尺寸裁一版 | `assets/bili-clean-logo.png`、`assets/bili-clean-banner.png`（`.svg` 是母版） |

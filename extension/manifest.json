@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bili Clean Follow（B站关注列表清理 · v2 插件预览版）",
-  "version": "2.0.0-alpha.3",
+  "version": "2.0.0.3",
   "description": "抓全 B站关注列表 + 本地分类（离线规则，或你自带 Key 的 OpenAI 兼容端点）+ 一句中文整理。取关是写操作：默认关闭，要开关 + 二次确认 + diff 预览 + 手输 UNFOLLOW。不发任何第三方服务，除非你自己填了端点。",
   "permissions": ["sidePanel", "storage", "cookies", "scripting"],
   "host_permissions": [

@@ -1,27 +1,31 @@
-// track_a_extension_e2e.mjs —— A 轨真机取证：真 Chrome + 未打包扩展 + B站接口替身。
+// track_a_extension_e2e.mjs —— A 轨真机取证：真 Chromium + 未打包扩展 + B站接口替身。
 //
 // 跑法（本机）：
-//   node tests/e2e/track_a_extension_e2e.mjs            # 有桌面会话时按 headed 跑（扩展能装）
-//   HEADLESS=1 node tests/e2e/track_a_extension_e2e.mjs # new headless；Chrome 156 下扩展装不上，会显式失败
+//   node tests/e2e/track_a_extension_e2e.mjs              # 默认 --headless=new（2026-10-26 实测能装扩展）
+//   HEADLESS=0 node tests/e2e/track_a_extension_e2e.mjs   # 有桌面会话时按有头跑（排查用）
+//   E2E_CHROME=<chrome 路径> node ...                     # 钉一个指定构建
 //
 // 取证口径：这条轨道的每条断言都标 kind=mock（B站接口是本机替身，不是真实会话）。
 // 真实登录态那条是 B 轨，绝不混在这里。
 //
-// 已知环境门禁（实测 2026-10-26，写进报告别当哑弹）：
-//   Chrome for Testing 156.0.8078.47 与 Playwright chromium-1248 都会**忽略** --load-extension，
-//   连一个只有 manifest+sw.js 的 hello world 都不注册；CDP Extensions.loadUnpacked 返回
-//   Invalid parameters。Playwright 默认还会注入 --disable-extensions（这里已经 ignoreDefaultArgs 摘掉）。
-//   结论：A 轨真机取证必须在「扩展可装载」的浏览器形态下跑（Linux CI 的 headed+xvfb，
-//   或钉一个仍支持 --load-extension 的 Chrome for Testing 版本）。装不上时本脚本以退出码 2
-//   明确失败，不会静默绿。
+// 装载方式（实测 2026-10-26，别再走回头路）：
+//   1) --load-extension 在 branded 构建里被**忽略**：Google Chrome / Chrome for Testing 127+ 都停了这个
+//      开关，Playwright 自带的 chromium-1248 就是 branded（CDP Browser.getVersion 回 product =
+//      "Chrome/156.0.8078.4"）。这条不是本机配置能改的。
+//   2) 真正能装的路子是浏览器级 CDP `Extensions.loadUnpacked`，--headless=new 下可用。
+//   3) 之前「本机所有 chromium 形态都装不上未打包扩展」的根因不在浏览器，而是 extension/manifest.json
+//      的 version 写成 `2.0.0-alpha.3`：Chrome 要求 version 是 1-4 段点分整数（每段 <= 65536），带后缀
+//      直接拒（CDP 回 "Required value 'version' is missing or invalid"）。同一个构建换合法版本号当场装成功。
+//      这条现在由 tools/package_release.mjs 的 chromeVersionOk() 钉成门禁。
+//   装不上时本脚本以退出码 2 明确失败，绝不静默绿；报告里 A 轨写「未取证」。
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
-import { buildPages, resolverArgs, startMockServer, uniqueMids } from "./mock_bilibili.mjs";
+import { SELF_MID, buildPages, resolverArgs, startMockServer, uniqueMids } from "./mock_bilibili.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const EXT = path.join(ROOT, "extension");
@@ -34,51 +38,142 @@ function findChromeForTesting() {
   const hit = fs.readdirSync(base).filter((d) => d.startsWith("win64-") || d.startsWith("linux64-"))
     .map((d) => path.join(base, d, "chrome-win64", "chrome.exe"))
     .filter((p) => fs.existsSync(p));
-  return hit[0] || null;
+  return hit[0] || process.env.CFT_PATH || null;
 }
 
-function registeredExtensions(profileDir) {
-  const file = path.join(profileDir, "Default", "Secure Preferences");
-  if (!fs.existsSync(file)) return {};
+/** 找一个「能装扩展」的完整 Chromium 构建：headless_shell 没有扩展子系统，不能用。 */
+function chromiumExecutable() {
+  if (process.env.E2E_CHROME) return path.resolve(process.env.E2E_CHROME);
+  const cft = findChromeForTesting();
+  if (cft && fs.existsSync(cft)) return cft;
+  let pw = null;
+  try { pw = chromium.executablePath(); } catch { pw = null; }
+  if (pw && fs.existsSync(pw) && !pw.includes("headless_shell")) return pw;
+  const base = process.platform === "win32"
+    ? path.join(process.env.LOCALAPPDATA || "", "ms-playwright")
+    : path.join(process.env.HOME || "", ".cache", "ms-playwright");
+  const cands = [];
+  if (fs.existsSync(base)) {
+    for (const dir of fs.readdirSync(base)) {
+      if (!/^chromium-\d+$/.test(dir)) continue;
+      for (const sub of ["chrome-win64/chrome.exe", "chrome-linux64/chrome", "chrome-linux/chrome"]) {
+        const p = path.join(base, dir, ...sub.split("/"));
+        if (fs.existsSync(p)) cands.push([Number(dir.split("-")[1]), p]);
+      }
+    }
+  }
+  cands.sort((a, b) => b[0] - a[0]);
+  return cands[0] ? cands[0][1] : pw;
+}
+
+/** CDP Extensions.loadUnpacked：Chrome 127+ 里唯一可靠的未打包扩展装载方式。 */
+async function loadUnpackedViaCdp(port, extDir) {
+  let wsUrl = null;
+  for (let i = 0; i < 80 && !wsUrl; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      const res = await fetch("http://127.0.0.1:" + port + "/json/version");
+      wsUrl = (await res.json()).webSocketDebuggerUrl;
+    } catch { /* 浏览器还在起 */ }
+  }
+  if (!wsUrl) { const e = new Error("CDP 端口 " + port + " 没起来"); e.code = "CDP_NOT_READY"; throw e; }
+  const ws = new WebSocket(wsUrl);
+  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
   try {
-    return (JSON.parse(fs.readFileSync(file, "utf8")).extensions || {}).settings || {};
-  } catch {
-    return {};
+    let seq = 0;
+    const pending = new Map();
+    ws.onmessage = (m) => {
+      const msg = JSON.parse(m.data);
+      if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
+    };
+    const send = (method, params) => new Promise((res) => {
+      const i = ++seq;
+      pending.set(i, res);
+      ws.send(JSON.stringify({ id: i, method, params }));
+    });
+    const r = await send("Extensions.loadUnpacked", { path: extDir.replace(/\\/g, "/") });
+    if (r.error) {
+      const e = new Error("Extensions.loadUnpacked 被拒：" + r.error.message);
+      e.cdpError = r.error;
+      throw e;
+    }
+    return r.result.id;
+  } finally {
+    ws.close();
   }
 }
 
-async function launch({ mock, profileDir }) {
-  const args = [
-    "--disable-extensions-except=" + EXT,
-    "--load-extension=" + EXT,
-    resolverArgs(mock.port),
-    "--ignore-certificate-errors",
-    "--test-type",
-    "--no-first-run",
-  ];
-  if (process.env.HEADLESS === "1") args.unshift("--headless=new");
-  const executablePath = findChromeForTesting();
-  return chromium.launchPersistentContext(profileDir, {
-    headless: process.env.HEADLESS !== "1",
-    executablePath: executablePath || undefined,
-    ignoreDefaultArgs: ["--disable-extensions"],
-    args,
-  });
+/**
+ * 登录态替身：扩展读不到 bili_jct 就不抓（background.js 里的 not_logged_in 分支），所以 A 轨要在这个
+ * 一次性画像里种 cookie。这是 **mock 登录态**，不是真实会话——真实登录态是 B 轨，绝不混。
+ */
+async function seedLoginCookies(ctx) {
+  const page = await ctx.newPage();
+  const session = await ctx.newCDPSession(page);
+  for (const [name, value] of [["bili_jct", "e2e-csrf-token"], ["SESSDATA", "e2e-sessdata"], ["DedeUserID", SELF_MID]]) {
+    await session.send("Network.setCookie", {
+      name, value, domain: ".bilibili.com", path: "/", secure: true, httpOnly: false, sameSite: "None",
+    });
+  }
+  await session.detach().catch(() => {});
+  await page.close().catch(() => {});
 }
 
-async function openSidePanel(ctx, profileDir) {
-  for (let i = 0; i < 20; i++) {
-    const settings = registeredExtensions(profileDir);
-    const id = Object.keys(settings).find((key) => {
-      const p = settings[key].path || "";
-      return p && fs.existsSync(p) && fs.existsSync(path.join(p, "manifest.json")) &&
-        fs.readFileSync(path.join(p, "manifest.json"), "utf8").includes("Bili Clean Follow");
-    });
-    if (id) {
-      const page = await ctx.newPage();
-      await page.goto("chrome-extension://" + id + "/sidepanel.html", { waitUntil: "domcontentloaded" });
-      return { page, id };
-    }
+let portSeq = Number(process.env.E2E_CDP_PORT || 9411);
+
+async function launch({ mock, profileDir }) {
+  const exe = chromiumExecutable();
+  if (!exe || !fs.existsSync(exe)) {
+    const e = new Error("找不到完整 Chromium 构建（headless_shell 不能装扩展）。用 E2E_CHROME=<chrome 路径> 指定。");
+    e.code = "EXTENSION_NOT_LOADED";
+    throw e;
+  }
+  const port = portSeq++;
+  let args = [
+    "--disable-gpu", "--no-sandbox", "--no-first-run", "--enable-extensions",
+    "--remote-debugging-port=" + port,
+    "--user-data-dir=" + profileDir,
+    resolverArgs(mock.port),
+    "--ignore-certificate-errors",
+    "about:blank",
+  ];
+  if (process.env.HEADLESS !== "0") args = ["--headless=new", ...args];
+  const proc = spawn(exe, args, { stdio: "ignore" });
+  let extensionId = null;
+  let loadError = null;
+  try {
+    extensionId = await loadUnpackedViaCdp(port, EXT);
+  } catch (err) {
+    loadError = err;
+  }
+  if (!extensionId) {
+    proc.kill();
+    const err = new Error("扩展没装进浏览器：" + (loadError && loadError.message) +
+      "。branded 构建会忽略 --load-extension，只能用 CDP Extensions.loadUnpacked；" +
+      "manifest 的 version 不是 1-4 段点分整数也会在这里被拒。");
+    err.code = "EXTENSION_NOT_LOADED";
+    throw err;
+  }
+  const browser = await chromium.connectOverCDP("http://127.0.0.1:" + port, { timeout: 60000 });
+  const ctx = browser.contexts()[0] || (await browser.newContext());
+  await seedLoginCookies(ctx);
+  return { browser, ctx, proc, extensionId, exe };
+}
+
+async function closeAll({ browser, proc }) {
+  try { await browser.close(); } catch { /* 已经关了 */ }
+  proc.kill();
+  await new Promise((r) => setTimeout(r, 800));
+}
+
+/** 按 loadUnpacked 返回的 id 直接开侧栏（不再从 Secure Preferences 里猜 id）。 */
+async function openSidePanel(ctx, extensionId) {
+  const url = "chrome-extension://" + extensionId + "/sidepanel.html";
+  for (let i = 0; i < 12; i++) {
+    const page = await ctx.newPage();
+    const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
+    if (resp && resp.ok() && (await page.$("#btn-start"))) return { page, id: extensionId };
+    await page.close().catch(() => {});
     await new Promise((r) => setTimeout(r, 500));
   }
   return null;
@@ -99,7 +194,8 @@ async function waitFetched(page, want, timeoutMs = 40000) {
 async function scenarioHappyPath(log) {
   const mock = await startMockServer({ pages: buildPages(PAGES) });
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "bcf-track-a-"));
-  const ctx = await launch({ mock, profileDir });
+  const run = await launch({ mock, profileDir });
+  const { ctx } = run;
   const offsite = [];
   ctx.on("request", (req) => {
     const host = new URL(req.url()).hostname;
@@ -107,17 +203,14 @@ async function scenarioHappyPath(log) {
       !req.url().startsWith("chrome://") && !req.url().startsWith("data:")) offsite.push(req.url());
   });
   try {
-    const opened = await openSidePanel(ctx, profileDir);
+    const opened = await openSidePanel(ctx, run.extensionId);
     if (!opened) {
-      const err = new Error("扩展没被注册：--load-extension 在这个浏览器形态下被忽略" +
-        "（Chrome for Testing 156 / Playwright chromium-1248 实测如此）。" +
-        "A 轨必须在能装载扩展的形态下跑：Linux CI headed+xvfb，或钉旧版 Chrome for Testing。");
+      const err = new Error("扩展装上了但侧栏打不开（chrome-extension://" + run.extensionId + "/sidepanel.html）");
       err.code = "EXTENSION_NOT_LOADED";
       throw err;
     }
     const { page, id } = opened;
     log.extensionId = id;
-
     // B2：抓全之前「开始分类」必须 disabled，且写明还没读全
     await page.click("#btn-start");
     await waitFetched(page, 20);
@@ -154,8 +247,9 @@ async function scenarioHappyPath(log) {
       const el = document.querySelector("#classify-summary");
       return el && !/^还没分类/.test(el.textContent.trim());
     }, null, { timeout: 20000 }).catch(() => {});
+    // 卡片真实文案是「类目名 23 条 · 37.1% 平均置信 …」：取数按「N 条」，不是「N 人」
     const counts = await page.$$eval("#category-list li", (lis) =>
-      lis.map((li) => Number((li.textContent.match(/(\d+)\s*人/) || [0, 0])[1])));
+      lis.map((li) => Number((li.textContent.match(/(\d+)\s*条/) || [0, 0])[1])));
     const sum = counts.reduce((a, b) => a + b, 0);
     log.cases.push({
       id: "C2", kind: "mock",
@@ -174,7 +268,7 @@ async function scenarioHappyPath(log) {
     });
     log.numbers = { follow_total: total, pages: pagesShown, cls_counts_sum: sum };
   } finally {
-    await ctx.close();
+    await closeAll(run);
     await mock.close();
   }
 }
@@ -183,11 +277,11 @@ async function scenarioRiskControl(log) {
   const pages = buildPages(PAGES);
   const mock = await startMockServer({ pages, riskOnPage: 2 });
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), "bcf-track-a-risk-"));
-  const ctx = await launch({ mock, profileDir });
+  const run = await launch({ mock, profileDir });
   try {
-    const opened = await openSidePanel(ctx, profileDir);
+    const opened = await openSidePanel(run.ctx, run.extensionId);
     if (!opened) {
-      const err = new Error("扩展没被注册（同上：环境形态不支持 --load-extension）");
+      const err = new Error("扩展装上了但侧栏打不开（风控场景，同上）");
       err.code = "EXTENSION_NOT_LOADED";
       throw err;
     }
@@ -207,13 +301,14 @@ async function scenarioRiskControl(log) {
       detail: { resumeVisible, classifyDisabled: disabled !== null, fetched },
     });
   } finally {
-    await ctx.close();
+    await closeAll(run);
     await mock.close();
   }
 }
 
 async function envVersions() {
-  const probe = await chromium.launch({ headless: true, executablePath: findChromeForTesting() || undefined });
+  const exe = chromiumExecutable();
+  const probe = await chromium.launch({ headless: true, executablePath: exe || undefined });
   const page = await probe.newPage();
   const ua = await page.evaluate(() => navigator.userAgent);
   await probe.close();
@@ -221,6 +316,8 @@ async function envVersions() {
   return {
     os: process.platform + " " + os.release(),
     chrome: (ua.match(/Chrome\/([\d.]+)/) || [0, "unknown"])[1],
+    chromePath: exe || "unknown",
+    loadMethod: "cdp:Extensions.loadUnpacked",
     node: process.version,
     playwright: pw,
     python: "见 pytest 侧报告（同一棵树同一环境）",
@@ -237,6 +334,7 @@ try {
   log.fatal = String(err && err.message);
   exitCode = err && err.code === "EXTENSION_NOT_LOADED" ? 2 : 1;
 }
+if (!log.fatal && log.cases.some((c) => !c.passed)) exitCode = 1;  // 任一条判红，取证脚本不能退 0
 log.finishedAt = new Date().toISOString();
 log.passed = log.cases.filter((c) => c.passed).length;
 log.total = log.cases.length;

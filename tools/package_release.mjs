@@ -39,6 +39,17 @@ const MINIMAL_HOSTS = [
 
 const SKIP_NAMES = new Set(["node_modules", ".git", ".DS_Store", "Thumbs.db"]);
 const RELEASE_VERSION_RE = /^\d+\.\d+\.\d+$/;   // 2.0.0 可以，2.0.0-alpha.3 不可以
+// 另一件事：Chrome 对 manifest 的 version 是硬校验——1-4 段点分整数、每段 0..65536。
+// 写成 2.0.0-alpha.3 这种带后缀的号，浏览器**根本不加载扩展**：Load unpacked 报
+// "Version is missing or not valid"，CDP Extensions.loadUnpacked 也拒。FOR-67 的 A 轨
+// 「本机所有 chromium 形态都装不上未打包扩展」根因就是这一行，不是浏览器形态。
+const CHROME_VERSION_RE = /^\d{1,5}(?:\.\d{1,5}){0,3}$/;
+
+/** 这个版本号 Chrome 认不认（与它算不算 release 号无关）。 */
+function chromeVersionOk(version) {
+  const s = String(version === undefined ? "" : version);
+  return CHROME_VERSION_RE.test(s) && s.split(".").every((part) => Number(part) <= 65536);
+}
 
 /** 收集要进 zip 的文件，返回 [{ abs, rel }]，按 rel 排序（可复现）。 */
 function collectExtensionFiles(extDir = EXT_DIR) {
@@ -68,6 +79,11 @@ function checkManifest(extDir = EXT_DIR) {
     return ["extension/manifest.json 不是合法 JSON：" + err.message];
   }
   if (manifest.manifest_version !== 3) problems.push("manifest_version 必须是 3，收到 " + manifest.manifest_version);
+  if (!chromeVersionOk(manifest.version)) {
+    problems.push("扩展版本 " + manifest.version + " 不是 Chrome 能接受的版本号：manifest 的 version 必须是 1-4 段"
+      + "点分整数且每段 <= 65536。写成带后缀的号，浏览器根本不加载这个扩展"
+      + "（Load unpacked 与 CDP Extensions.loadUnpacked 都会报 Version is missing or not valid）。");
+  }
   if (!RELEASE_VERSION_RE.test(String(manifest.version || ""))) {
     problems.push("扩展版本 " + manifest.version + " 不是正式版号（预发布后缀不算 release）：" +
       "发 v2.0.0 之前把 extension/manifest.json 的 version 改成 2.0.0");
@@ -313,6 +329,6 @@ function main() {
 }
 
 export { collectExtensionFiles, checkManifest, readReportDecision, checkReportJson, runGates,
-  buildZip, verifyZip, QA_JSON_FIELDS, QA_TRACK_LABELS, MINIMAL_HOSTS, RELEASE_VERSION_RE };
+  buildZip, verifyZip, QA_JSON_FIELDS, QA_TRACK_LABELS, MINIMAL_HOSTS, RELEASE_VERSION_RE, CHROME_VERSION_RE, chromeVersionOk };
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main();
