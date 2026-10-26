@@ -229,6 +229,13 @@ jobs:
       - name: A-track real-machine assertions (6/6, otherwise the job is red)
         run: node tests/e2e/track_a_extension_e2e.mjs
 
+      # B 轨（真实登录态只读）在 CI 上不能碰真实账号——没有人的授权就不跑（脚本自己退 4）。
+      # 但它可以且必须在 CI 上证明两件事：① 只读护栏确实看得见 MV3 service worker 的抓取路径，
+      # 并且拦得住写请求（主动 POST /x/relation/delete 被 failRequest）；② 逐条快照走字段白名单。
+      # 没有这两条，B 轨一开就是拿真账号试错。产物只写 tmp/，kind=mock，永不进 docs/qa-evidence/。
+      - name: B 轨替身自检（只读护栏 + 快照白名单；不碰真实账号，产物不进 git）
+        run: node tests/e2e/track_b_real_readonly.mjs --mock
+
       # 报告与 FOR-71 复核引用的是这份构建产物，不是谁本机的 tmp 文件。
       - name: Upload evidence (track-a.json + chrome-matrix.json)
         if: always()
