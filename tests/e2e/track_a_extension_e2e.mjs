@@ -26,44 +26,28 @@ import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 
 import { SELF_MID, buildPages, resolverArgs, startMockServer, uniqueMids } from "./mock_bilibili.mjs";
+import { CFT_DIR, listChromeBuilds, selectChromeForExtensionTest } from "./chrome_choice.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 const EXT = path.join(ROOT, "extension");
 const PAGES = [20, 20, 22];
 const EXPECT_TOTAL = 62;
 
-function findChromeForTesting() {
-  const base = path.join(import.meta.dirname, "browser", "chrome");
-  if (!fs.existsSync(base)) return process.env.CFT_PATH || null;
-  const hit = fs.readdirSync(base).filter((d) => d.startsWith("win64-") || d.startsWith("linux64-"))
-    .map((d) => path.join(base, d, "chrome-win64", "chrome.exe"))
-    .filter((p) => fs.existsSync(p));
-  return hit[0] || process.env.CFT_PATH || null;
-}
-
-/** 找一个「能装扩展」的完整 Chromium 构建：headless_shell 没有扩展子系统，不能用。 */
-function chromiumExecutable() {
-  if (process.env.E2E_CHROME) return path.resolve(process.env.E2E_CHROME);
-  const cft = findChromeForTesting();
-  if (cft && fs.existsSync(cft)) return cft;
-  let pw = null;
-  try { pw = chromium.executablePath(); } catch { pw = null; }
-  if (pw && fs.existsSync(pw) && !pw.includes("headless_shell")) return pw;
-  const base = process.platform === "win32"
-    ? path.join(process.env.LOCALAPPDATA || "", "ms-playwright")
-    : path.join(process.env.HOME || "", ".cache", "ms-playwright");
-  const cands = [];
-  if (fs.existsSync(base)) {
-    for (const dir of fs.readdirSync(base)) {
-      if (!/^chromium-\d+$/.test(dir)) continue;
-      for (const sub of ["chrome-win64/chrome.exe", "chrome-linux64/chrome", "chrome-linux/chrome"]) {
-        const p = path.join(base, dir, ...sub.split("/"));
-        if (fs.existsSync(p)) cands.push([Number(dir.split("-")[1]), p]);
-      }
-    }
+/**
+ * 选浏览器：只选一次，探针结果复用。
+ * 这里刻意不「按目录顺序取第一个」：tests/e2e/browser/chrome/ 下常常并存多个 Chrome for Testing
+ * 构建，字典序最小的是 126，而它没有浏览器级 CDP 的 Extensions.loadUnpacked（134 也有另一种拒法），
+ * 于是默认跑法会假性红在「A 轨未取证」上。真正的选择与拒因记录在 chrome_choice.mjs。
+ */
+let choicePromise = null;
+function chromeChoice() {
+  if (!choicePromise) {
+    choicePromise = selectChromeForExtensionTest({
+      extDir: EXT,
+      onSkip: (msg) => console.error("[e2e][build] 跳过 " + msg),
+    });
   }
-  cands.sort((a, b) => b[0] - a[0]);
-  return cands[0] ? cands[0][1] : pw;
+  return choicePromise;
 }
 
 /** CDP Extensions.loadUnpacked：Chrome 127+ 里唯一可靠的未打包扩展装载方式。 */
@@ -122,9 +106,12 @@ async function seedLoginCookies(ctx) {
 let portSeq = Number(process.env.E2E_CDP_PORT || 9411);
 
 async function launch({ mock, profileDir }) {
-  const exe = chromiumExecutable();
+  const choice = await chromeChoice();
+  const exe = choice.exe;
   if (!exe || !fs.existsSync(exe)) {
-    const e = new Error("找不到完整 Chromium 构建（headless_shell 不能装扩展）。用 E2E_CHROME=<chrome 路径> 指定。");
+    const e = new Error("找不到能把未打包扩展装进去的 Chromium 构建。被拒的构建：" +
+      (choice.rejected.map((r) => r.build + " -> " + r.error).join(" | ") || "这台机器上没有候选") +
+      "。用 E2E_CHROME=<chrome 路径> 钉一个；manifest 的 version 不是 1-4 段点分整数也会在这里被拒。");
     e.code = "EXTENSION_NOT_LOADED";
     throw e;
   }
@@ -157,7 +144,7 @@ async function launch({ mock, profileDir }) {
   const browser = await chromium.connectOverCDP("http://127.0.0.1:" + port, { timeout: 60000 });
   const ctx = browser.contexts()[0] || (await browser.newContext());
   await seedLoginCookies(ctx);
-  return { browser, ctx, proc, extensionId, exe };
+  return { browser, ctx, proc, extensionId, exe, build: choice.build, source: choice.source };
 }
 
 async function closeAll({ browser, proc }) {
@@ -307,7 +294,8 @@ async function scenarioRiskControl(log) {
 }
 
 async function envVersions() {
-  const exe = chromiumExecutable();
+  const choice = await chromeChoice();
+  const exe = choice.exe;
   const probe = await chromium.launch({ headless: true, executablePath: exe || undefined });
   const page = await probe.newPage();
   const ua = await page.evaluate(() => navigator.userAgent);
@@ -317,12 +305,35 @@ async function envVersions() {
     os: process.platform + " " + os.release(),
     chrome: (ua.match(/Chrome\/([\d.]+)/) || [0, "unknown"])[1],
     chromePath: exe || "unknown",
+    chromeBuild: choice.build || "unknown",
+    chromeSource: choice.source,
+    rejectedBuilds: choice.rejected,
     loadMethod: "cdp:Extensions.loadUnpacked",
     node: process.version,
     playwright: pw,
     python: "见 pytest 侧报告（同一棵树同一环境）",
   };
 }
+
+/**
+ * --doctor：只回答「这台机器上哪些 Chromium 构建真能把未打包扩展装进去」，不跑用例。
+ * FOR-71 的亲自验装、FOR-68 的 extension.zip 解压即用先跑它，免得把「夹具挑错构建」当成产品回归。
+ * 退出码：0 有能用的构建；3 一个都没有（这时要先装/钉一个 Chrome for Testing 127+）。
+ */
+async function doctor() {
+  const choice = await chromeChoice();
+  const ok = Boolean(choice.exe) && choice.source !== "none";
+  console.log(JSON.stringify({
+    ok,
+    cftDir: CFT_DIR,
+    cftCandidates: listChromeBuilds().map((c) => c.dir),
+    chosen: ok ? { exe: choice.exe, build: choice.build, source: choice.source } : null,
+    rejected: choice.rejected,
+  }, null, 2));
+  process.exit(ok ? 0 : 3);
+}
+
+if (process.argv.includes("--doctor")) await doctor();
 
 const log = { track: "A", kind: "mock", startedAt: new Date().toISOString(), cases: [], numbers: {} };
 let exitCode = 0;
