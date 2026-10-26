@@ -14,9 +14,24 @@ no longer remember following. Manually going through them is painful. This tool
 scores each follow for "worth keeping" and hands you a short list of candidates
 to unfollow.
 
+> ⚠️ **Unfollowing is a real write operation (v2 extension) - OFF by default.** The tool only reports
+> until you arm it on purpose: the "enable unfollow" switch + a second confirmation (it spells out
+> `POST x/relation/delete`, the rate, and that unfollowing is not reversible) -> you must **see a diff
+> preview** (N affected, per-category counts, 10 samples) -> then **type `UNFOLLOW`** by hand.
+> Batch size defaults to 50 with a **hard cap of 200**; there is a **800 ms/row floor** plus jitter; a
+> Bilibili risk-control code (`-352` / HTTP 412) **trips a circuit breaker and saves a checkpoint**.
+> `keep` categories, "unsure" rows and anything with confidence < 0.55 **never become candidates**.
+> Before the first write, the exact manifest (mid + nickname + time) is persisted, and one click
+> re-follows (`x/relation/add`) everyone who was actually unfollowed. Every success and failure lands
+> in an audit log exportable as CSV. **Bilibili has no undo API**: a wrong unfollow can only be
+> mitigated, never guaranteed. Automated unfollowing is account activity and may trigger risk control;
+> you carry that risk. The seven guardrails are documented in the Chinese README
+> (「取关的七条安全护栏」).
+
 ## Features
-- **Report-only and safe by default**: it never calls the unfollow API and never
-  touches your account.
+- **Report-only and safe by default**: the Python CLI and the local web reporter never call the
+  unfollow API and never touch your account. The v2 extension can unfollow, but only after
+  you explicitly arm it (off by default, seven guardrails - see the warning above).
 - **Explainable**: every decision carries a numeric score and a reason string.
 - **Exports** **Markdown** (for humans) and **CSV** (for spreadsheets), plus an
   optional "unfollow list": one row per candidate, `mid <TAB> nickname`.
@@ -33,7 +48,7 @@ to unfollow.
 
 ## Quick start
 
-Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 247 tests green).
+Prerequisite: Python 3.9+ (CI covers 3.9-3.13 plus a Windows GBK smoke job and a real-chromium DOM gate for the web report; verified locally on 3.13.15, 248 tests green).
 The commands below work the same on Windows, macOS and Linux. A clean virtual environment
 is recommended.
 
@@ -148,8 +163,10 @@ Open http://127.0.0.1:8787 to see:
 - removal-candidate preview: export the unfollow list (.txt) after confirming each item;
 - one-click Markdown / CSV export.
 
-Everything stays on this machine: the tool never calls an unfollow API,
-and it never connects to any external service.
+Everything stays on this machine: the Python CLI and the local web reporter never call an
+unfollow API and never connect to any external service. The v2 extension *can* unfollow, but
+only after you arm it explicitly: off by default, diff preview + typed UNFOLLOW + batch and
+rate caps + circuit breaker + an audit log and a one-click re-follow safety net.
 
 ## Safety note
 This tool reports only. It does **not** unfollow, does **not** upload your data,

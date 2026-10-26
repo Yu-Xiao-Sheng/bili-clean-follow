@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Bili Clean Follow · 侧栏</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <header>
+    <h1 class="brand">Bili Clean Follow <span class="tag">v2 预览 · 分类 + 一句话整理（取关默认关闭）</span></h1>
+    <p class="lede">先读全，再分类，然后一句话整理。取关是写操作：默认关闭，要开关 + 二次确认 + diff 预览 + 手输 UNFOLLOW 才会执行。</p>
+  </header>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">抓取进度</span>
+      <span id="status-pill" class="pill idle">未开始</span>
+    </div>
+    <div class="progress"><div id="progress-bar" class="bar"></div></div>
+    <div class="stats">
+      <div><span id="stat-fetched" class="num">0</span><span class="unit">已取</span></div>
+      <div><span id="stat-total" class="num">-</span><span class="unit">关注数 total</span></div>
+      <div><span id="stat-pages" class="num">0</span><span class="unit">页数</span></div>
+    </div>
+    <div id="progress-line" class="state-line">还没开始抓取。</div>
+    <div id="hint-line" class="hint"></div>
+  </section>
+
+  <section class="card actions">
+    <button id="btn-start" class="primary">读全我的关注列表</button>
+    <button id="btn-resume" class="ghost" hidden>继续抓取</button>
+    <button id="btn-stop" class="ghost" hidden>停止</button>
+    <button id="btn-login" class="ghost">检查登录态</button>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">下一步</span>
+      <span id="classify-lock" class="lock"></span>
+    </div>
+    <div class="export-row">
+      <button id="btn-classify" class="primary" disabled>开始分类</button>
+      <button id="btn-classify-local" class="ghost" disabled>只用离线规则分类</button>
+      <button id="btn-classify-stop" class="ghost" hidden>停止分类</button>
+    </div>
+    <div id="classify-line" class="state-line">读全（fetched == total）之后才解锁分类。抓到的数据会保留，中断后点「继续抓取」。</div>
+  </section>
+
+  <section class="card">
+    <span class="label">AI 分类（BYOK：你自己的模型端点，可跳过）</span>
+    <div class="field">
+      <span class="field-label">预设</span>
+      <select id="llm-preset"></select>
+    </div>
+    <label class="field"><span class="field-label">baseURL</span><input id="llm-baseurl" type="url" placeholder="https://api.deepseek.com/v1"></label>
+    <label class="field"><span class="field-label">模型名</span><input id="llm-model" type="text" placeholder="deepseek-chat"></label>
+    <label class="field"><span class="field-label">API Key</span><input id="llm-key" type="password" autocomplete="off" placeholder="只存本机浏览器扩展存储"></label>
+    <label class="check"><input id="llm-sendbio" type="checkbox" checked><span>发送简介（取消勾选则只发昵称）</span></label>
+    <div class="export-row">
+      <button id="btn-llm-save" class="ghost">保存配置</button>
+      <button id="btn-llm-clearkey" class="ghost">清除 Key</button>
+      <button id="btn-llm-clearconsent" class="ghost">撤回外发确认</button>
+    </div>
+    <div id="llm-line" class="hint">没填 Key：只用离线规则分类，零外发。</div>
+    <p class="foot">凭据永不出本机；昵称与简介只发给你自己指定的模型端点。不含 Cookie / UID / mid / 头像 / 关注关系。</p>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">分类结果</span>
+      <span id="classify-source" class="tag"></span>
+    </div>
+    <div id="classify-summary" class="state-line">还没分类。</div>
+    <ul id="category-list" class="cats"></ul>
+    <p class="foot">「保留」= 这类 UP 主永不进入取关候选；「进候选」= 交给后续取关流程（本版不会自动取关）。低置信（&lt; 0.55）一律进「待确认」，不硬塞。</p>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span class="label">指令栏（说一句话就能整理）</span>
+      <span id="cmd-source" class="tag"></span>
+    </div>
+    <label class="field"><span class="field-label">自然语言指令</span>
+      <input id="cmd-input" type="text" placeholder="例：保留所有游戏区的，把搞笑段子和影视解说都清掉">
+    </label>
+    <div class="export-row">
+      <button id="btn-cmd-parse" class="primary" disabled>解析意图</button>
+      <button id="btn-cmd-apply" class="ghost" disabled>确认应用（不会取关）</button>
+      <button id="btn-cmd-rollback" class="ghost" disabled>回滚最近一步</button>
+    </div>
+    <div id="cmd-line" class="state-line">读全并分类之后才解锁指令栏。意图只改「保留 / 进候选」与本地类别，任何情况下都不会替你取关。</div>
+    <ul id="intent-list" class="intents"></ul>
+    <div id="intent-preview" class="preview" hidden></div>
+    <ul id="op-stack" class="ops"></ul>
+  </section>
+  <section class="card">
+    <span class="label">分类体系（12 类预置，可增删改名）</span>
+    <ul id="taxonomy-list" class="tax"></ul>
+    <div class="tax-add">
+      <input id="tax-new-name" type="text" placeholder="新类别名，如 手工DIY">
+      <input id="tax-new-keywords" type="text" placeholder="关键词，逗号分隔">
+      <button id="btn-tax-add" class="ghost">添加</button>
+    </div>
+    <div id="tax-line" class="hint"></div>
+  </section>
+
+  <section class="card">
+    <span class="label">只读导出</span>
+    <div class="export-row">
+      <button id="btn-export-md" class="ghost" disabled>Markdown</button>
+      <button id="btn-export-csv" class="ghost" disabled>CSV（带 BOM）</button>
+      <button id="btn-export-unfollow" class="ghost" disabled>取关候选清单</button>
+    </div>
+    <p class="foot">导出文件里没有 Cookie、没有 Key。清单只用于人工核对，工具不会自动取关。</p>
+  </section>
+
+  <section class="card danger">
+    <div class="row">
+      <span class="label">取关（写操作 · 默认关闭 · 不可撤销）</span>
+      <span id="unfollow-state" class="pill idle">关闭</span>
+    </div>
+    <label class="check"><input id="unfollow-switch" type="checkbox"><span>开启取关能力（会真的调用 B站写接口，需要二次确认）</span></label>
+    <label class="field"><span class="field-label">单次批量上限（默认 50，硬上限 200）</span>
+      <input id="unfollow-limit" type="number" min="1" max="200" value="50" disabled>
+    </label>
+    <div id="unfollow-line" class="state-line">取关关闭中：不会调用任何写接口。开启前请先读 README 里的取关风险说明。</div>
+    <div class="export-row">
+      <button id="btn-unfollow-preview" class="ghost" disabled>看 diff 预览</button>
+      <button id="btn-unfollow-exec" class="danger" disabled>执行取关（要手输 UNFOLLOW）</button>
+      <button id="btn-unfollow-resume" class="ghost" hidden>从断点继续</button>
+      <button id="btn-unfollow-restore" class="ghost" disabled>一键重新关注（补救）</button>
+      <button id="btn-audit-csv" class="ghost" disabled>导出审计 CSV</button>
+    </div>
+    <div id="unfollow-preview" class="preview" hidden></div>
+    <div id="unfollow-progress" class="state-line" hidden></div>
+    <p class="foot">取关不可撤销：B站没有撤销 API。keep 类、待确认与低置信（&lt; 0.55）永不进候选；速率下限 800ms/条；遇 -352 / 412 立刻熔断并保存断点；执行前落盘本次清单（mid + 昵称 + 时间），可一键重新关注补救。</p>
+  </section>
+  <section class="card">
+    <span class="label">审计（最近事件）</span>
+    <ul id="audit-list" class="audit"></ul>
+  </section>
+
+  <dialog id="risk-dialog">
+    <h2 id="risk-title">开启取关能力前请先确认（不可撤销）</h2>
+    <ul id="risk-lines" class="consent"></ul>
+    <label class="check"><input id="risk-ack" type="checkbox"><span>我已了解：这会真的取关别人，且 B站没有撤销 API</span></label>
+    <div class="export-row">
+      <button id="risk-accept" class="danger" disabled>开启取关能力</button>
+      <button id="risk-cancel" class="ghost">取消</button>
+    </div>
+    <p class="foot" id="risk-foot">自动化取关可能触发 B站风控；本工具不绕签名、不绕过限速，速率与批量都由上面的下限约束。</p>
+  </dialog>
+
+  <dialog id="unfollow-dialog">
+    <h2 id="unfollow-dialog-title">执行取关：请手输 UNFOLLOW</h2>
+    <div id="unfollow-summary" class="state-line"></div>
+    <label class="field"><span class="field-label" id="unfollow-token-label">手输 UNFOLLOW（区分大小写）</span>
+      <input id="unfollow-token" type="text" autocomplete="off" spellcheck="false" placeholder="UNFOLLOW">
+    </label>
+    <div class="export-row">
+      <button id="unfollow-confirm" class="danger" disabled>确认执行</button>
+      <button id="unfollow-cancel" class="ghost">取消</button>
+      <button id="unfollow-stop-exec" class="ghost" hidden>停止</button>
+    </div>
+    <p class="foot">没看过 diff 预览就执行不了：预览指纹会与实际执行清单逐条比对，清单变了就必须重看。</p>
+  </dialog>
+  <dialog id="consent-dialog">
+    <h2 id="consent-title">启用 AI 分类前请先确认</h2>
+    <ul id="consent-lines" class="consent"></ul>
+    <label class="check"><input id="consent-sendbio" type="checkbox" checked><span>发送简介（取消勾选则只发昵称）</span></label>
+    <div class="export-row">
+      <button id="consent-accept" class="primary">我已确认，开始 AI 分类</button>
+      <button id="consent-cancel" class="ghost">取消</button>
+    </div>
+    <p class="foot" id="consent-privacy"></p>
+  </dialog>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>
