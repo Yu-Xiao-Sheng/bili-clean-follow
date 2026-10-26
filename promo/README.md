@@ -9,6 +9,9 @@
 
 ## 命令
 
+> v2 两支新片（Chrome 插件形态）的段表与出片顺序在下面「v2 两支新片（FOR-70）」一节；本节命令是 v0.1.x 旧片的，保留作历史素材。
+
+
 ```
 npm run studio                 # 浏览器里实时预览（默认 :3000）
 npm run render                 # 产品介绍片 -> out/bili-clean-promo.mp4（1920x1080 @30fps）
@@ -68,6 +71,68 @@ python qa.py out/v3/*.png      # 帧质检：空白帧 / 内容触边（需 pill
 
 改代码前后请重跑上面三条命令，别让片子讲一个已经过时的版本。
 
+## v2 两支新片（FOR-70 · Chrome 插件形态）
+
+分镜与口径见 [v2-script.md](v2-script.md)（FOR-69 定稿）。旧的两支 CLI 片不再投放，只作历史素材保留。
+
+### 1. 产品介绍片 `BiliCleanV2Promo` — 1800 帧 / 60.0 秒（1920x1080 @30fps）
+
+| 段 | 帧区间 | 内容 | 素材 |
+|---|---|---|---|
+| Hook | 0-130 | 关注 `{{follow_total}}` 个 / 第 `{{pages}}` 页；「这里面，你有多久没打开过？」 | 数字注入 + 排版 |
+| Install | 130-330 | 四步装插件（zip → 解压 → 开发者模式 → 加载已解压的扩展程序）；大字「不用 clone、不用 pip、不用 Python」 | 排版 |
+| OpenPanel | 330-470 | 侧栏滑出，一键读全 | `public/v2/scan-complete.png` |
+| Gate | 470-600 | 读全门禁：没读全时「开始分类」是灰的，旁边写「还没读全（已取 `{{partial_fetched}}`/`{{follow_total}}`）」 | `public/v2/scan-partial.png` |
+| Classify | 600-830 | 12 张分类卡片，数量与占比来自 `{{cls.counts}}` | 注入数字 + `public/v2/classify-cards.png` |
+| CommandBar | 830-1080 | 逐字打字「保留所有游戏区的，把搞笑段子和影视解说都清掉」+ 意图条 | `public/v2/command-bar.png` |
+| Diff | 1080-1280 | diff 预览 `{{diff.n}}` 条 · 按类分组 · 「这一步不会取关任何账号」 | `public/v2/diff-preview.png` |
+| Guardrails | 1280-1470 | 七条护栏 + 二次确认卡 + 手输 UNFOLLOW + 已执行 `{{unfollow.done}}` 条 | `public/v2/unfollow-token.png` |
+| Audit | 1470-1600 | 审计逐条 + 导出 + 一键重新关注 | `public/v2/audit-list.png` |
+| Honesty | 1600-1720 | 隐私口径三行（不填 Key 零外发） | 排版 |
+| Cta | 1720-1800 | 先看清，再决定 · v2.0.0 · MIT | 排版 |
+
+### 2. 插件操作教程片 `WalkthroughV2` — 2700 帧 / 90.0 秒（1920x1080 @30fps）
+
+| 段 | 帧区间 | 内容 | 素材 |
+|---|---|---|---|
+| W1 | 0-120 | 标题 | 排版 |
+| W2 | 120-430 | STEP1 装插件 + 两个常见坑 | 排版 |
+| W3 | 430-700 | STEP2 读全：进度与页数、抓全才能分类 | `scan-partial.png` + `scan-complete.png` |
+| W4 | 700-1000 | STEP3 AI 分类（BYOK、告知弹窗、`batch {{batch.cur}}/{{batch.total}}`） | `classify-cards.png` |
+| W5 | 1000-1250 | STEP4 分类卡片上的操作 | `classify-cards.png` |
+| W6 | 1250-1600 | STEP5 自然语言三条指令（逐字打字 + 意图条） | `command-bar.png` |
+| W7 | 1600-1950 | STEP6 武装取关：开关 / 二次确认 / UNFOLLOW / 上限 / 速率 | `guardrail-risk.png` + `unfollow-token.png` |
+| W8 | 1950-2200 | STEP7 审计与补救 | `audit-list.png` |
+| W9 | 2200-2400 | STEP8 油猴脚本只读模式 | 排版 |
+| W10 | 2400-2560 | STEP9 Python CLI 已进维护模式（冻结 v0.1.3） | 排版 |
+| W11 | 2560-2700 | CTA | 排版 |
+
+### 出片顺序（每一步都可能把你挡下，这是设计如此）
+
+```
+npm run fill          # docs/qa-report-v2.json -> src/numbers.generated.ts；报告不在就退出码 1
+npm run capture:v2    # 把 extension/sidepanel.* 当页面加载，拍 8 张真实侧栏 DOM 截图 -> public/v2/
+npm run render:v2     # -> out/bili-clean-v2-promo.mp4（1800 帧）
+npm run render:v2:walk# -> out/bili-clean-v2-walkthrough.mp4（2700 帧）
+npm run preview:gif   # -> ../assets/preview-v2-promo.gif / preview-v2-walkthrough.gif（480x270 · 8fps · <=8MB）
+npm run film:v2       # 上面全部串起来
+```
+
+- **数字门禁**：`src/numbers.generated.ts` 是 stub 时，两支片渲染会在第一帧之前抛错。占位符集合见 `src/numbersCore.mjs`
+  （`{{follow_total}}` `{{pages}}` `{{partial_fetched}}` `{{cls.counts}}` `{{cls.count.<类目 id>}}` `{{diff.n}}` `{{unfollow.done}}` `{{batch.cur}}/{{batch.total}}`）。
+  文案集中在 `src/v2-copy.ts`，出现裸数字会被 `tests/promo/numbers_gate.test.mjs` 判红。
+- **界面门禁**：`tools/capture_ui.mjs` 用 FOR-67 的取证报告给真实侧栏 DOM 喂状态，再逐张核对「像素里的数字 == 报告里的数字」
+  （已取/total/页数/卡片张数/diff 人数）。对不上的镜头在 `public/v2/manifest.json` 里标 `usable: false`，`make_gifs.mjs` 直接拒。
+  本机所有 chromium 形态都不注册未打包扩展（FOR-67 实测），所以走「页面上下文加载真实 UI」，不是手绘 mock，也不是旧 Web 报告界面。
+- **帧质检**：`python promo/qa.py promo/out/*.png`（空白帧 BLANK / 内容触边 TOUCHES_EDGE）。v2 两支的静帧已跑通。
+- **README 门禁**：GIF 落在 `../assets/preview-v2-*.gif`，由 `tools/build_readme_preview.py`（FOR-66）校验存在且 <=8MB。
+
+### 现在还缺什么才出片
+
+1. `docs/qa-report-v2.json`（FOR-67）：片内全部数量的唯一来源。缺它 `npm run fill` 就红，两支片渲不出来。
+2. 抓取快照（建议 `docs/qa-evidence/scan-items.json`，FOR-67 追加）：逐条列表的像素要有真实昵称/mid。
+   没有它 `capture_ui` 只拍聚合层，且会把 `syntheticNames: true` 写进 manifest，GIF 环节直接拒。
+3. B 轨真实登录态会话（FOR-67 B4）：需要已登录 B站的浏览器环境或明确授权。
 ## 已完成 / 待补
 
 - 音轨：`tools/gen_bgm.mjs` 本地合成（和弦垫 + 琶音 + 轻 kick + hat），两支各一条、时长精确对齐帧数，零版权风险；真人配音仍未录。

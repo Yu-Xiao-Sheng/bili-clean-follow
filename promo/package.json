@@ -1,13 +1,21 @@
 {
   "name": "bili-clean-follow-promo",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.2",
   "scripts": {
     "studio": "remotion studio",
     "bgm": "node tools/gen_bgm.mjs",
+    "fill": "node tools/fill_numbers.mjs",
+    "capture:v2": "node tools/capture_ui.mjs",
+    "fill:check": "node tools/fill_numbers.mjs",
     "render": "node tools/gen_bgm.mjs && remotion render BiliCleanPromo out/bili-clean-promo.mp4 --crf=20",
     "render:walk": "node tools/gen_bgm.mjs && remotion render Walkthrough out/bili-clean-walkthrough.mp4 --crf=20",
     "render:master": "npm run render && npm run render:walk",
+    "render:v2": "node tools/fill_numbers.mjs && node tools/gen_bgm.mjs --frames 1800 --out public/audio/bgm-v2-promo.wav && remotion render BiliCleanV2Promo out/bili-clean-v2-promo.mp4 --crf=20",
+    "render:v2:walk": "node tools/fill_numbers.mjs && node tools/gen_bgm.mjs --frames 2700 --out public/audio/bgm-v2-walk.wav && remotion render WalkthroughV2 out/bili-clean-v2-walkthrough.mp4 --crf=20",
+    "still:v2": "remotion still BiliCleanV2Promo out/frame-v2.png --frame=700",
+    "preview:gif": "node tools/make_gifs.mjs",
+    "film:v2": "node tools/fill_numbers.mjs && node tools/capture_ui.mjs && npm run render:v2 && npm run render:v2:walk && node tools/make_gifs.mjs",
     "still:promo": "remotion still BiliCleanPromo out/promo-frame.png --frame",
     "still:walk": "remotion still Walkthrough out/walk-frame.png --frame"
   },
@@ -19,7 +27,8 @@
   },
   "devDependencies": {
     "@types/react": "18.3.12",
-    "typescript": "5.6.3"
+    "typescript": "5.6.3",
+    "gifenc": "^1.0.3"
   },
   "description": "Remotion project for the bili-clean-follow product & walkthrough videos"
 }

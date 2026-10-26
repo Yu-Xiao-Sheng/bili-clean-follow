@@ -57,6 +57,8 @@ signals*.csv
 promo/out/
 promo/.remotion/
 promo/public/audio/
+promo/public/v2/
+
 
 # FOR-67 track A evidence: local browser binaries and evidence output stay out of git
 tests/e2e/browser/

@@ -149,8 +149,6 @@ export const WALK = {
     },
   ],
   cta: {
-    line1: "README 顶部有图文安装教程",
-    line2: "常见问题在 Issues · MIT 开源",
-    line3: COMPLIANCE,
+    lines: ["README 顶部有图文安装教程", "常见问题在 Issues · MIT 开源", COMPLIANCE],
   },
 };
