@@ -1,0 +1,15 @@
+{
+  "name": "bili-clean-follow-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "FOR-67 三轨取证的测试夹具与替身（不是扩展运行时依赖：extension/ 依旧零构建）",
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "track-a": "node track_a_extension_e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1",
+    "selfsigned": "^5.5.0"
+  }
+}

@@ -139,3 +139,24 @@ jobs:
 
       - name: Offline unit tests (no browser, no Bilibili account)
         run: node --test tests/extension/*.test.mjs
+
+  # FOR-67：A 轨地基门禁。存在的理由：三轨真机取证要等「扩展能装载」的浏览器形态，
+  # 但夹具与替身不该等——62 条 / 3 页 / mid 去重 / 风控注入这些形状一旦漂了，
+  # A 轨的断言就是空枪，所以先把地基钉成 CI。
+  e2e-fixture:
+    name: test - e2e 夹具与接口替身（FOR-67 A 轨地基）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install harness deps (tests/e2e only; extension/ stays dependency-free)
+        run: npm ci --prefix tests/e2e
+
+      - name: Fixture + mock self-test
+        run: node --test tests/e2e/*.test.mjs
