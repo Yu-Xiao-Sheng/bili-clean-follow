@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 
+## [2.0.0] - 待发布（发布门禁：docs/qa-report-v2.md 结论必须是 Go）
+
+FOR-68 交付物打包。**本节不发 Release、不打 tag**：FOR-67 的三轨取证报告还没落地，`node tools/package_release.mjs`
+现在跑就是退出码 1（报告缺失），这正是 FOR-68 钉住的口径——「报告不存在或结论 No-Go 时不得打包、不得建 tag / Release」。
+下面列的是**已经就位**的交付物：报告一 Go，zip 与 tag 立刻能出。
+
+### Added
+- **发布门禁工具 `tools/package_release.mjs`**：把「没有测试报告就没有 release」变成退出码。逐条验：`docs/qa-report-v2.md` 必须在位；
+  结论行必须能读出 Go（写 No-Go 就退出码 2，与「报告没跑」的 1 分开）；`docs/qa-report-v2.json` 兄弟文件必须齐且对账
+  （`sum(cls.counts) == follow_total` / `diff.n >= unfollow.done` / `unfollow.done <= 50` / 三轨标 mock|real|offline，
+  **B 轨不是 real 直接拒** —— FOR-67 硬条件①）；`extension/manifest.json` 必须 MV3 + 正式版号（`2.0.0-alpha.3` 这种号打不了 v2.0.0）
+  + `host_permissions` 不超出 B站三域 + manifest 引用的文件在位。过门禁才产出 `dist/bili-clean-follow-<version>-extension.zip`：
+  zip 是零依赖实现（`node:zlib` + 手写 central directory），条目排序 + 固定时间戳 => **同一棵树两次打包字节一致**，sha256 才有意义；
+  写盘后自己读回来逐条比 CRC 与文件名。`--check` 只验门禁不写文件（CI 用）。
+- **油猴脚本 `userscripts/bili-clean.user.js`（交付物 2，只读）**：给不便装扩展的用户。关注页注入按钮 -> 读全关注列表
+  （`fetched >= total` 才算读全，2000 展示上限与列表漂移两种情况显式提示）-> 离线粗分类（12 类 + 其他 + 待确认，置信封顶 0.68，
+  < 0.55 进待确认）-> 导出 CSV（带 UTF-8 BOM）/ `to-unfollow.txt`（`mid <TAB> 昵称`）/ Markdown 报告。**不含任何写操作**：
+  全脚本只有一处 `fetch`，唯一的请求构造器只放行 `api.bilibili.com` 的三个只读接口 + GET + 无请求体；写接口
+  （`/x/relation/delete`、`/x/relation/add`、`block`、`blacklist`、`tag`）只准出现在禁用清单里，别处出现即测试红；
+  `@grant none`，不用 `GM_xmlhttpRequest` / `unsafeWindow` / `document.cookie`。没有 AI 分类、没有取关、没有断点续抓（差异写进教程）。
+- **Edge Add-ons 上架材料登记 `docs/edge-add-ons-submission.md`（交付物 6）**：图标与截图清单、商店简介（中英文案）、
+  隐私说明与「为什么要这些权限」的逐条答复、上架步骤与人工开关（Edge 开发者后台账号、商店付款、隐私政策 URL）。状态：**待提交**。
+- CI 新增 `release-gate` job：报告不在位时它必须红（门禁自己失效也算红），`v*` tag 触发时强制跑 `--check` ——
+  想给 v2.0.0 打 tag，先把报告跑出来。
+
+### Changed
+- `docs/extension-install.md` 从「预览版进行中」改成 v2.0.0 交付口径：安装 4 步、油猴脚本安装与能力差异、截图清单（含哪些必须人工补拍）。
+- `PRIVACY.md` 定稿：去掉「草案」，补油猴脚本（只读、零模型外发）与 Edge Add-ons 上架的隐私口径。
+- `README.md` 首屏加插件形态入口（教程链接 + 「zip 在报告 Go 之后随 v2.0.0 Release 提供」），并把 CLI 维护模式写成硬口径：
+  **CLI 冻结在 v0.1.3，只做安全修复**，不再加功能。
+
+### Tests
+- 扩展离线单测 150 -> 175 项：`userscript_readonly`（14：只读护栏 / 写接口只出现在禁用清单 / 外链 host 白名单 /
+  只读常量与 `biliApi.js` 同源 / 分类体系与 `taxonomy.js` 逐类比对 / 读全门禁 / 抓取循环含风控断点 /
+  导出 BOM 与候选清单身逐字一致）+ `release_package_gate`（9：缺报告拦 / No-Go 退出码 2 / 无结论行拦 /
+  Go 且契约齐放行 / json 四条对账 / B 轨标 mock 拦 / 预发布版本号与 manifest 引用缺失与 host 超集拦 /
+  zip 可复现与自检 / 门禁常量与 `tests/test_release_hygiene.py` 不漂移）+ 交付物清单核对 2 项（工单六条逐个 in-place、PRIVACY 去掉「草案」、
+  报告 Go 之前任何文档不得挂 `releases/download/v2.*` 的 zip 链接——假链接也是假话）。
+- pytest 256 项不变（CLI 侧未动）。
+
+### Blocked（发布前必须清）
+- FOR-67 的 `docs/qa-report-v2.md` / `.json` 未产出：三轨真机取证卡在「扩展能装载」的浏览器形态（见 `tests/e2e/README.md` 的环境门禁）、
+  B 轨真实登录态授权、以及 FOR-66 的 Pages 人工开关。这三条不清，本节只能停在「待发布」。
 ## [2.0.0-alpha.3] - 2026-10-26 （插件预览版，未发 Release）
 
 FOR-65：自然语言指令 + 真实取关执行器。分支 `eng/for-65-intent-unfollow`（基线 = FOR-64 的 `eng/for-64-ai-classify-followup` = `2952c28`）。

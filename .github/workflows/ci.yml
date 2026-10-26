@@ -143,6 +143,35 @@ jobs:
   # FOR-67：A 轨地基门禁。存在的理由：三轨真机取证要等「扩展能装载」的浏览器形态，
   # 但夹具与替身不该等——62 条 / 3 页 / mid 去重 / 风控注入这些形状一旦漂了，
   # A 轨的断言就是空枪，所以先把地基钉成 CI。
+  # FOR-68：「没有测试报告就没有 release」的执行装置。报告不在位时这个 job 必须红
+  # （门禁自己失效也算红），推 v* tag 时强制过一遍 --check：想打 v2.0.0，先把报告跑出来。
+  release-gate:
+    name: gate - qa-report Go 之前不打包不打 tag（FOR-68）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: "actions/setup-node@v4"
+        with:
+          node-version: "20"
+
+      - name: Packaging gate must refuse while the report is missing
+        run: |
+          if [ -f docs/qa-report-v2.md ]; then
+            node tools/package_release.mjs --check
+          else
+            if node tools/package_release.mjs --check; then
+              echo "docs/qa-report-v2.md 不在位却放行了：发布门禁失效。"
+              exit 1
+            fi
+            echo "报告未落地：按 FOR-68 口径拒绝打包（这是预期行为，job 绿）"
+          fi
+
+      - name: On a v* tag the gate must actually pass
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node tools/package_release.mjs --check --expect-version=2.0.0
   e2e-fixture:
     name: test - e2e 夹具与接口替身（FOR-67 A 轨地基）
     runs-on: ubuntu-latest
