@@ -258,3 +258,53 @@ def test_qa_report_v2_ships_a_machine_readable_sibling():
     for track in ("A", "B", "C"):
         assert tracks.get(track) in QA_TRACK_LABELS, (
             "%s 轨必须标 mock / real / offline（报告不得把 mock 写成真实会话）" % track)
+
+# FOR-70 追加（FOR-67 认下来）：片子的逐条列表镜头需要可回放的抓取快照。
+# 这份快照要进仓库，所以字段是白名单制——多一个键都可能把凭据带进 git。
+QA_EVIDENCE_ITEMS = "docs/qa-evidence/scan-items.json"
+QA_EVIDENCE_KEYS = {"mid", "name", "category", "confidence"}
+
+
+def test_qa_evidence_scan_items_snapshot_matches_the_report():
+    """逐条快照必须与报告逐条对齐，且只带四个脱敏字段（FOR-70 追加口径）。
+
+    FOR-70 的 promo/tools/capture_ui.mjs 拿这份快照拍「分类卡片 / 指令预览 / 审计列表」
+    的逐条镜头；没有它 capture_ui 会把 syntheticNames 写成 true 并拒绝出 GIF。所以契约
+    由 FOR-67 定死在这里：条数 == follow_total，类目分布 == cls.counts，字段只有四个。
+    """
+    import pytest
+    md = REPO_ROOT / QA_REPORT_MD
+    if not md.exists():
+        pytest.skip("%s 尚未产出：快照契约等三轨取证跑完再生效" % QA_REPORT_MD)
+    data = json.loads((REPO_ROOT / QA_REPORT_JSON).read_text(encoding="utf-8"))
+    snap = REPO_ROOT / QA_EVIDENCE_ITEMS
+    assert snap.exists(), (
+        "%s 缺失：FOR-70 的逐条列表镜头只能拿占位昵称（capture_ui 会把 syntheticNames "
+        "写成 true 并拒绝出 GIF）。B 轨抓到多少条就脱敏落多少条。" % QA_EVIDENCE_ITEMS)
+    items = json.loads(snap.read_text(encoding="utf-8"))
+    assert isinstance(items, list) and items, "快照必须是非空数组"
+    mids = [str(it.get("mid", "")) for it in items]
+    assert len(set(mids)) == len(mids), "mid 不得重复（与 B1 的 mid 去重口径一致）"
+    assert len(items) == data["follow_total"], (
+        "快照 %d 条 != 报告 follow_total %s：片中的列表与报告对不上"
+        % (len(items), data["follow_total"]))
+    per_cat = {}
+    for it in items:
+        extra = set(it) - QA_EVIDENCE_KEYS
+        missing = QA_EVIDENCE_KEYS - set(it)
+        assert not extra and not missing, (
+            "快照字段必须正好是 mid / name / category / confidence（多出来的键可能把 "
+            "cookie、token、设备指纹带进仓库）：多=%s 少=%s"
+            % (sorted(extra), sorted(missing)))
+        assert it["mid"] and str(it["name"]).strip(), (
+            "昵称或 mid 为空：逐条镜头会拍成空白，报告里的昵称也不该是空的")
+        assert it["category"] in data["cls"]["counts"], (
+            "类目 %r 不在报告 cls.counts 的类目集合里" % it["category"])
+        conf = it["confidence"]
+        assert isinstance(conf, (int, float)) and 0 <= conf <= 1, (
+            "confidence 必须是 0..1 的数值（分类置信度口径）")
+        per_cat[it["category"]] = per_cat.get(it["category"], 0) + 1
+    expected = {k: v for k, v in data["cls"]["counts"].items() if v}
+    assert per_cat == expected, (
+        "逐条快照的类目分布与报告 cls.counts 不一致：快照 %s != 报告 %s"
+        % (per_cat, expected))
