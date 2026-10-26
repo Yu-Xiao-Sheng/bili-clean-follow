@@ -85,3 +85,72 @@ dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--c
 dialog::backdrop { background: rgba(6, 8, 12, .72); }
 dialog h2 { margin: 0 0 10px; font-size: 15px; }
 .consent { margin: 0 0 10px; padding-left: 18px; font-size: 12px; line-height: 1.7; }
+/* --- FOR-65：指令栏 / diff 预览 / 取关（写操作）--- */
+.card.danger {
+  border-left: 3px solid #b0433f;
+}
+
+button.danger {
+  background: #b0433f;
+  border-color: #b0433f;
+  color: #fff;
+}
+
+button.danger:disabled {
+  background: #4a3230;
+  border-color: #5a3b38;
+  color: #9b8b89;
+}
+
+ul.intents,
+ul.ops {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+ul.intents li.warn {
+  color: #d7a13f;
+}
+
+ul.ops {
+  color: var(--muted, #9aa4b2);
+  font-size: 12px;
+}
+
+.preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+}
+
+.preview-head {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.preview-sub {
+  margin-top: 8px;
+  color: var(--muted, #9aa4b2);
+}
+
+.preview-cats,
+.preview-samples,
+.preview-notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.preview-notes {
+  margin-top: 8px;
+  color: #d7a13f;
+}
+
+.preview-blocked {
+  color: var(--muted, #9aa4b2);
+}

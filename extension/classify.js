@@ -196,6 +196,17 @@ export function createClassifyStore({ storage, now = () => Date.now() } = {}) {
     return map;
   }
 
+  /** 整张决策表写回（FOR-65 的「回滚最近一步」要用：一次改多个类别，不能一条条写）。 */
+  async function saveDecisions(map) {
+    const clean = {};
+    for (const [id, decision] of Object.entries(map || {})) {
+      if (!decision || decision === DECISION.UNDECIDED) continue;
+      clean[String(id)] = decision;
+    }
+    await guarded({ [DECISIONS_KEY]: clean }, "classify_decisions");
+    return clean;
+  }
+
   async function clearAll() {
     const got = await storage.get(null);
     const keys = Object.keys(got || {}).filter(
@@ -220,6 +231,7 @@ export function createClassifyStore({ storage, now = () => Date.now() } = {}) {
     saveMeta,
     loadDecisions,
     saveDecision,
+    saveDecisions,
     clearAll,
   };
 }

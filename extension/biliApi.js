@@ -7,7 +7,9 @@
 //   x/relation/stat        code=0                        → 匿名可用（authority 信号）
 //   x/web-interface/card   code=0                        → 匿名可用（简介/认证/粉丝数）
 //   x/space/arc/search、x/polymer/web-dynamic/v1/feed/space → HTTP 412（需 wbi 签名）→ 不依赖
-//   x/relation/delete / x/relation/add                   → 写接口，FOR-63 这一步绝不调用
+//   x/relation/delete / x/relation/add                   → 写接口：FOR-63 一条都不调；FOR-65 起
+//     才允许调用，但只准经 unfollow.js 的七条护栏（默认关闭 + diff 预览 + 手输 UNFOLLOW
+//     + 批量上限 + 速率下限 + 熔断断点 + 审计/补救），见 v2-spec §4
 // 接口名散落到别处，下一次改版就会把 -352 那两个重新捡回来。所以这里既是实现也是门禁，
 // FORBIDDEN_ENDPOINTS + tests/extension/bili_api_semantics.test.mjs 一起钉住。
 //
@@ -26,15 +28,41 @@ export const ENDPOINTS = {
   spaceTopArc: API_ORIGIN + "/x/space/top/arc",
 };
 
-// 实测不可用 / 属于写操作的接口。代码里出现即测试失败。
+// 实测不可用，或语义上永远不该做的接口。代码里出现即测试失败。
 export const FORBIDDEN_ENDPOINTS = [
   "/x/relation/followers", // 实测 -352 风控
   "/x/space/wbi/acc/info", // 实测 -352 风控
-  "/x/relation/delete", // 写操作：FOR-63 不做取关
-  "/x/relation/add", // 写操作：FOR-63 不做补关注
+  "/x/relation/block", // 拉黑不是「清理关注」，永远不做
+  "/x/relation/blacklist", // 同上
+  "/x/relation/tag", // 关注分组写操作：本版不做
   "/x/space/arc/search", // 实测 HTTP 412
   "/x/polymer/web-dynamic/v1/feed/space", // 实测 HTTP 412
 ];
+
+/**
+ * 写接口（FOR-65，v2-spec §4）：v1 的 report-only 支柱改写成
+ * 「默认只报告，写操作要显式武装」。这两个接口在本扩展里只准出现在这一处，
+ * 调用面只有 unfollow.js（带七条护栏）与 background.js（唯一有 fetch 的地方）；
+ * 别的模块出现接口名字符串 = tests/extension/write_endpoint_boundary.test.mjs 直接红。
+ */
+export const WRITE_ENDPOINTS = {
+  unfollow: API_ORIGIN + "/x/relation/delete", // 取关
+  addFollow: API_ORIGIN + "/x/relation/add", // 一键重新关注（补救）
+};
+
+/** 写接口的表单体：B站要 form fid + csrf。csrf = bili_jct，只在内存里存在：
+ *  不进 storage、不进审计、不进日志（privacy.js 会拦，本函数的调用方也不许把它传出去）。
+ *  拿不到 csrf 就抛 —— 没有 csrf 的写请求一律不发。 */
+export function buildWriteForm({ mid, csrf }) {
+  const fid = String(mid === undefined || mid === null ? "" : mid).trim();
+  if (!/^\d+$/.test(fid)) throw new Error("fid 必须是纯数字 mid，收到 " + JSON.stringify(String(fid).slice(0, 24)));
+  const token = String(csrf === undefined || csrf === null ? "" : csrf).trim();
+  if (!token) throw new Error("csrf 为空：拿不到 bili_jct 就不发起写操作（多半是没登录）");
+  const params = new URLSearchParams();
+  params.set("fid", fid);
+  params.set("csrf", token);
+  return params.toString();
+}
 
 // ps=20 是实测可用的分页粒度（更大的 ps 会被截断），别顺手改成 50。
 export const PAGE_SIZE = 20;

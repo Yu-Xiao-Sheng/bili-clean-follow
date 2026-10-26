@@ -343,6 +343,65 @@ export async function classifyBatch({ batch, taxonomy, config, apiKey, fetchImpl
 }
 
 /**
+ * 通用 chat 调用（FOR-65 意图解析用）：与 classifyBatch 共用端点与错误语义，
+ * 但载荷里没有 UP 主数据 —— 只有用户那句指令与类别名清单（v2-spec §3.4）。
+ * 网络调用在本扩展里只有两处实现：classifyBatch（分类）与此处（意图）。
+ * intent.js / preview.js / unfollow.js 一律不得出现 fetch(，它们靠注入的传输层。
+ */
+export async function callChatCompletion({ body, config, apiKey, fetchImpl, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+  const check = validateEndpoint(config && config.baseUrl);
+  if (!check.ok) return { ok: false, kind: check.kind };
+  if (!apiKey) return { ok: false, kind: "no_key" };
+  const doFetch = fetchImpl || (typeof fetch === "function" ? fetch.bind(globalThis) : null);
+  if (!doFetch) return { ok: false, kind: "network_error" };
+  try {
+    assertSecretFree(JSON.stringify(body), "intent request payload");
+  } catch (err) {
+    return { ok: false, kind: "bad_payload", message: redactSecrets(err.message) };
+  }
+  const controller = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = controller && timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  let response;
+  try {
+    response = await doFetch(completionsUrl(config.baseUrl), {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + apiKey },
+      body: JSON.stringify(body),
+      signal: controller ? controller.signal : undefined,
+    });
+  } catch (err) {
+    if (timer) clearTimeout(timer);
+    if (err && err.name === "AbortError") return { ok: false, kind: "aborted" };
+    return { ok: false, kind: "network_error", message: redactSecrets(err && err.message) };
+  }
+  if (timer) clearTimeout(timer);
+  const text = await readText(response);
+  if (response.status === 401 || response.status === 403) return { ok: false, kind: "unauthorized", status: response.status };
+  if (response.status === 429) return { ok: false, kind: "rate_limited", status: response.status };
+  if (!response.ok) {
+    return { ok: false, kind: response.status >= 500 ? "provider_error" : "bad_payload", status: response.status };
+  }
+  const content = extractToolArguments(text) || extractContent(text);
+  if (!content) return { ok: false, kind: "bad_payload", status: response.status };
+  return { ok: true, content, status: response.status };
+}
+
+/** function-calling 回的是 tool_calls[].function.arguments：优先取它，再退回 message.content。 */
+function extractToolArguments(text) {
+  let payload = null;
+  try {
+    payload = JSON.parse(text);
+  } catch (err) {
+    return null;
+  }
+  const first = (payload && Array.isArray(payload.choices) ? payload.choices[0] : null) || {};
+  const message = (first.message || {});
+  const call = Array.isArray(message.tool_calls)
+    ? message.tool_calls.find((c) => c && c.function && c.function.arguments)
+    : null;
+  return call ? String(call.function.arguments) : null;
+}
+/**
  * 全量分类（按 40 条一批）。没有 Key 或未确认告知时一条都不发。
  * 降级：某批失败 → 该批走离线，source = "local_degraded"（验收 2）。
  */

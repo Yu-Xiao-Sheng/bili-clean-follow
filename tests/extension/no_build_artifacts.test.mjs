@@ -90,21 +90,46 @@ test("每个扩展 JS 都是可解析的 ESM（无编译步骤），核心模块
     fs.rmSync(tmp, { force: true });
   }
   for (const mod of ["privacy.js", "biliApi.js", "store.js", "report.js", "background.js",
-    "content/followpage.js", "taxonomy.js", "classifyLocal.js", "classifyLlm.js", "classify.js"]) {
+    "content/followpage.js", "taxonomy.js", "classifyLocal.js", "classifyLlm.js", "classify.js",
+    "intent.js", "preview.js", "intentStack.js", "unfollow.js"]) {
     await import("../../extension/" + mod); // 非浏览器环境能加载 = 没有偷偷依赖构建产物
   }
 });
 
-test("写操作接口仍然全禁（取关由 FOR-65 带护栏接入，这一版一条都不写）", () => {
-  const src = files.filter((f) => f.endsWith(".js"))
-    .map(codeOnly)
-    .map((text) => text.replace(/export const FORBIDDEN_ENDPOINTS = \[[\s\S]*?\];/, "")) // 黑名单本身不算调用
-    .join("\n");
-  for (const banned of ["x/relation/delete", "x/relation/add", "x/relation/block", "x/relation/tag"]) {
-    assert.ok(!src.includes(banned), "本版不得出现写接口：" + banned);
+// FOR-65 改写口径（v2-spec §4）：v1 的 report-only 支柱变成
+// 「默认只报告，写操作要显式武装」。这条测试从「一条写接口都不许出现」改成
+// 「写接口只准出现在接口层 + 护栏模块里，且护栏模块不得自己发请求」。
+// 故意保留的红线：拉黑 / 黑名单 / 关注分组写操作仍然全禁，永远不做。
+test("写接口只存在于接口层与取关护栏模块，且护栏模块自己不发请求", () => {
+  const byName = new Map(files.filter((f) => f.endsWith(".js")).map((f) => [path.basename(f), codeOnly(f)]));
+  const writePaths = ["x/relation/delete", "x/relation/add"];
+  const allowed = new Set(["biliApi.js", "unfollow.js"]); // 表 + 风险文案；调用面另有测试钉
+  for (const [name, text] of byName) {
+    const stripped = name === "biliApi.js"
+      ? text.replace(/export const FORBIDDEN_ENDPOINTS = \[[\s\S]*?\];/, "").replace(/export const WRITE_ENDPOINTS = \{[\s\S]*?\};/, "")
+      : text;
+    for (const banned of writePaths) {
+      if (allowed.has(name)) continue;
+      assert.ok(!stripped.includes(banned), name + " 里不该出现写接口名：" + banned);
+    }
   }
-  // 只读语义：报告产物必须自称 report-only
-  assert.ok(src.includes("Report-only: this tool never unfollows anything by itself."));
+  // 永远不许做的写操作：出现即红（接口层黑名单之外）
+  for (const [name, text] of byName) {
+    if (name === "biliApi.js") continue;
+    for (const banned of ["x/relation/block", "x/relation/blacklist", "x/relation/tag", "x/relation/followers", "x/space/wbi/acc/info"]) {
+      assert.ok(!text.includes(banned), name + " 里出现了永久禁用接口：" + banned);
+    }
+  }
+  // 护栏模块不许自己 fetch：写请求只能由 background.js 发（它也是唯一读 cookie 拿 csrf 的地方）
+  for (const name of ["unfollow.js", "preview.js", "intent.js", "intentStack.js", "sidepanel.js", "store.js"]) {
+    assert.ok(byName.has(name), "FOR-65 的新模块要在位：" + name);
+    assert.ok(!byName.get(name).includes("fetch("), name + " 里不得出现 fetch(：传输层是注入的");
+  }
+  // 取关风险文案必须有唯一来源，UI 不得另写一份
+  assert.ok(byName.get("unfollow.js").includes("不可撤销"));
+  assert.ok(byName.get("unfollow.js").includes("写接口"));
+  // CLI/导出清单的 report-only 措辞仍然逐字保留（与 export.py 比对）
+  assert.ok(byName.get("report.js").includes("Report-only: this tool never unfollows anything by itself."));
 });
 
 test("外发目的地只有两类：B站自己的域，和用户自己填的 BYOK 预设端点", () => {

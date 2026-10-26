@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions.
 
+## [2.0.0-alpha.3] - 2026-10-26 （插件预览版，未发 Release）
+
+FOR-65：自然语言指令 + 真实取关执行器。分支 `eng/for-65-intent-unfollow`（基线 = FOR-64 的 `eng/for-64-ai-classify-followup` = `2952c28`）。
+
+### Added
+- **意图 DSL 与自然语言指令（`extension/intent.js`）**：一句中文 -> `{intents:[{op:keep|candidates|move|only, categories:[稳定 id], keyword, target}]}`。双轨：填了 Key 先试 LLM function-calling（`intentToolSchema` + 新增的 `classifyLlm.callChatCompletion`），没 Key / 401 / 输出不是 JSON / 发明的类别 -> 一律回落本地语法并**显式标出回落原因**（`source` / `fallbackKind` / `fallbackNote`）。本地语法覆盖 保留 / 留下 / 清掉 / 取关 / 移到X / 只看X + 类名与别名模糊匹配，v2-spec §3.4 的示例句（「保留所有游戏区的，把搞笑段子和影视解说都清掉」）解析结果与文档逐字对上（`keep game` + `candidates funny,film` + `keyword 影视解说`）；`游戏区` 这类口语后缀不算关键词，`影视解说` 这类更具体的说法记进 `keyword` 但默认按整类处理，只有显式关键词（名字带X / 带「X」的）才做子串筛选，**没命中就 0 改动，不退回整类**。`keep` 与 `candidates` 点到同一类时 **keep 赢**并在预览里说明；意图外发载荷只有「指令原文 + 类别名」，没有 mid / 昵称 / 简介 / 凭据。
+- **diff 预览与安全候选（`extension/preview.js`）**：任何意图先渲染预览（影响 N 人、按类分组的数量与占比走 `categorySummary`、最多 10 条样例「昵称 + 简介 + 置信度」、被挡计数）。`safeCandidateMids()` 是取关候选的唯一入口，按 FOR-64 交接里钉住的硬约束再挡一道：`candidateMids()` 会放行的「待确认」（fixture 里的 `22002`）在取关候选里必须消失；低置信（< 0.55）、没勾「进候选」的类、以及自己的 mid 同样不进。预览内容算 FNV-1a 指纹（忽略时间戳）落 `unfollow_arm.v1` 带 10 分钟 TTL —— 「看过预览」不是 UI 传来的布尔值，而是可被比对、可作废的记录。
+- **取关执行器与七条护栏（`extension/unfollow.js` + `background.js` 的 `writeTransport`）**：a 写操作默认关闭，开启要开关 + 带版本号二次确认（`riskNotice` 写清接口 / 速率 / 不可撤销 / 批量上限，文案改版旧确认作废）；b 执行前必须看过 diff 预览（指纹与 TTL 比对：没看过 / 清单变了 / 过期各自拒）且手输 `UNFOLLOW`；c 单次默认 50、硬上限 200，超上限**整批拒**不静默截断；d 速率下限 800ms/条 + jitter（调用方传 0 也只夹到下限），遇 `-352` / HTTP 412 以及 `-101` 立刻熔断并保存断点（连续 3 条失败也熔断），「从断点继续」要重新看预览重新手输；e 执行时按当前 `results`/`decisions` 重算候选，keep 类与待确认一个都不发；f 第一条写请求发出前落盘「本次将取关清单（mid + 昵称 + 时间）」，一键重新关注（`x/relation/add`）只补这批里真的取关成功的人；g 每条成功 / 失败进 `unfollow_audit.v1`，导出带 BOM 的 CSV。`biliApi.js` 新增 `WRITE_ENDPOINTS` + `buildWriteForm`（form `fid + csrf`，缺 csrf 或非数字 mid 直接抛），拉黑 / 黑名单 / 关注分组接口进永久黑名单。
+- **操作栈与回滚（`extension/intentStack.js`）**：每步意图落 `intent_ops.v1`（最多 50 步），回滚只撤销这一步动过的类别（不抹用户后来手工改的其它类别），`move` 按 mid 还原单条类别；侧栏「回滚最近一步」+ 操作栈可见。
+- 侧栏新增「指令栏」与「取关（默认关闭）」两张卡：解析 -> 预览 -> 确认应用（不会取关）-> 回滚；取关侧是开关 + 二次确认弹窗 + diff 预览 + 手输 `UNFOLLOW` 弹窗 + 断点续跑 + 一键重新关注 + 审计 CSV 导出。批量上限一改，旧的「看过预览」立即作废。
+
+### Changed
+- v1 的 report-only 支柱改写成「**默认只报告，写操作要显式武装**」（CLI 仍然 report-only）。README 顶部新增取关风险块与「取关的七条安全护栏」章节；`docs/extension-install.md` 新增 4.5 节；`PRIVACY.md` 写清写请求只带 `fid` + `csrf`（csrf 现场取、不落盘不进日志）、审计与清单不含凭据形态。
+- 测试门禁口径随之更新（**故意改红再改绿**）：`no_build_artifacts` 里「写操作接口仍然全禁」改成「写接口只存在于接口层与取关护栏模块，且护栏模块自己不发 `fetch(`」；`biliApi.js` 的 `FORBIDDEN_ENDPOINTS` 把两个写接口移交给新的 `WRITE_ENDPOINTS`（并补进 `block` / `blacklist` / `tag` 三个永久黑名单），`bili_api_semantics` 的既有断言不变仍绿；`buildWriteForm` 的 form `fid` + `csrf` 断言、写接口名只有一个落点、以及「候选清单不由消息决定，service worker 从 storage 重算」都在新增的 `write_endpoint_boundary` 里。
+- 侧栏与 manifest 的自述从「只读 + 分类 / 不取关不写操作」改成「取关是写操作：默认关闭，要开关 + 二次确认 + diff 预览 + 手输 UNFOLLOW」；扩展版本 2.0.0-alpha.2 -> 2.0.0-alpha.3。
+
+### Tests
+- 扩展离线单测 88 -> 149 项（+61）：`intent_dsl`(13) / `diff_preview`(7) / `unfollow_guardrails`(17) / `intent_stack`(8) / `unfollow_ui`(7) / `write_endpoint_boundary`(6) / `intent_unfollow_flow`(3，端到端 mock 串跑)。护栏用例的统一断言形态是「护栏没过时 transport 调用次数 = 0」，用来钉死「任何路径都不存在未确认即写」。pytest 248 项不变（CLI 侧未动）。
+- 未真机验证（归 FOR-67）：`x/relation/delete` / `add` 的真实登录态联调、MV3 service worker 长批量下的断点行为，目前全部走 mock 传输层。
+
 ## [2.0.0-alpha.2] - 2026-10-26 （插件预览版，未发 Release）
 
 插件（`extension/`，Manifest V3，零构建步骤）是 v2 的主实现；Python CLI 冻结在 0.1.3 进维护模式。

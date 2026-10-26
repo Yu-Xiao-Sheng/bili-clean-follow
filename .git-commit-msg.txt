@@ -1,0 +1,38 @@
+feat(extension): 自然语言指令 + 真实取关执行器（意图 DSL / diff 预览 / 七条护栏 / 审计与回填）（FOR-65）
+
+一句中文就能整理并清理关注：「保留所有游戏区的，把搞笑段子和影视解说都清掉」。
+取关是真实写操作，默认关闭，七条护栏全过才会发出第一条请求。
+
+新增
+- intent.js：自然语言 -> 意图 DSL {intents:[{op:keep|candidates|move|only, categories:[稳定 id], keyword, target}]}。
+  双轨：有 Key 先试 LLM function-calling（intentToolSchema + classifyLlm.callChatCompletion），
+  没 Key / 401 / 非 JSON / 发明的类别一律回落本地语法并标出回落原因。本地语法覆盖 保留 / 留下 / 清掉 /
+  取关 / 移到X / 只看X + 类名与别名模糊匹配；keep 与 candidates 撞车时 keep 赢；外发载荷只有指令原文与类别名。
+- preview.js：任何意图先渲染 diff 预览（影响 N 人、按类分组数量与占比、最多 10 条样例、被挡计数）。
+  safeCandidateMids() 是取关候选唯一入口：在 FOR-64 交接钉住的约束上再挡一道 —— 待确认（unsure）、
+  置信 < 0.55、没勾「进候选」的类、自己的 mid 全部排除；预览内容 FNV-1a 指纹落 unfollow_arm.v1（10 分钟 TTL）。
+- unfollow.js：取关执行器与七条护栏（a 默认关闭 + 带版本号二次确认；b 必须看过预览且手输 UNFOLLOW；
+  c 单次默认 50 / 硬上限 200，超限整批拒；d 速率下限 800ms + jitter，-352 / 412 / -101 与连续 3 败熔断并存断点；
+  e keep 与未表态类别永不进候选，执行前按当前数据重算；f 第一条写请求前落盘取关清单，一键重新关注只补成功的人；
+  g 每条成败进审计并可导出带 BOM 的 CSV）。护栏未过时抛 UnfollowGuardError，transport 调用次数 = 0。
+- intentStack.js：意图操作栈（intent_ops.v1，最多 50 步）与「回滚最近一步」，只撤销这一步动过的类别。
+- background.js：唯一写请求发起点 writeTransport（form fid + csrf，csrf 现场取、只在内存、不落盘）；
+  消息只带 confirmation/limit/intervalMs，要取关谁由 service worker 从 storage 重算；缺 csrf 直接拒。
+- sidepanel：「指令栏」与「取关（默认关闭）」两张卡 + 取关风险 / 手输 UNFOLLOW 两个 dialog；
+  批量上限一改，旧的「已看过预览」立即作废。
+- biliApi.js：WRITE_ENDPOINTS + buildWriteForm；FORBIDDEN_ENDPOINTS 交出两个写接口，改收 block / blacklist / tag。
+
+测试
+- node:test 88 -> 149 项（+61）：intent_dsl(13) / diff_preview(7) / unfollow_guardrails(17) /
+  intent_stack(8) / unfollow_ui(7) / write_endpoint_boundary(6) / intent_unfollow_flow(3)。
+  护栏用例统一断言「护栏没过时 transport 调用次数 = 0」，钉死「任何路径都不存在未确认即写」。
+- 故意改红再改绿：no_build_artifacts 的「写接口全禁」改成「写接口只在接口层与护栏模块，且护栏模块自己不发 fetch(」；
+  永久红线（拉黑 / 黑名单 / 关注分组）保留。classify_llm_fixture 里 FOR-64 钉的 22002 契约未动，仍绿。
+- pytest 248 项不变（CLI 侧未动，仍 report-only）。
+
+文档
+- README 顶部取关风险块 + 「取关的七条安全护栏」章节；README_en 同步；docs/extension-install.md 新增 4.5；
+  PRIVACY.md 写清写请求只带 fid + csrf（csrf 现场取、不落盘不进日志）；CHANGELOG 落 2.0.0-alpha.3。
+
+未验证（归 FOR-67）：x/relation/delete 与 add 的真实登录态联调、MV3 service worker 长批量下的断点行为，
+目前全部走 mock 传输层。
